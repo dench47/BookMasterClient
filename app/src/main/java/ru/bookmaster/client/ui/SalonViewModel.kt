@@ -2,12 +2,15 @@ package ru.bookmaster.client.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import ru.bookmaster.client.data.api.RetrofitClient
 import ru.bookmaster.client.data.model.*
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -23,7 +26,9 @@ data class ClientUiState(
     val clientPhone: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isSuccess: Boolean = false
+    val isSuccess: Boolean = false,
+    val showMyAppointments: Boolean = false,
+    val myAppointments: List<AppointmentResponse> = emptyList()
 )
 
 class SalonViewModel : ViewModel() {
@@ -34,6 +39,28 @@ class SalonViewModel : ViewModel() {
     fun onSalonIdChange(id: String) { _state.value = _state.value.copy(salonId = id) }
     fun onNameChange(n: String) { _state.value = _state.value.copy(clientName = n) }
     fun onPhoneChange(p: String) { _state.value = _state.value.copy(clientPhone = p) }
+    fun hideMyAppointments() { _state.value = _state.value.copy(showMyAppointments = false) }
+
+    fun loadMyAppointments() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, error = null)
+            try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await() ?: ""
+                val r = api.getMyAppointments(fcmToken)
+                if (r.isSuccessful) {
+                    val apps = r.body()?.filter {
+                        val dt = LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                        dt.isAfter(LocalDateTime.now()) && it.cancelled != true
+                    } ?: emptyList()
+                    _state.value = _state.value.copy(myAppointments = apps, showMyAppointments = true, isLoading = false)
+                } else {
+                    _state.value = _state.value.copy(error = "Записи не найдены", isLoading = false)
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Ошибка: ${e.message}", isLoading = false)
+            }
+        }
+    }
 
     fun loadSalon() {
         val id = _state.value.salonId.toLongOrNull() ?: return
@@ -94,7 +121,6 @@ class SalonViewModel : ViewModel() {
                 if (!_state.value.bookedSlots.any { it.startsWith(full) }) slots.add(time)
             }
         }
-        // Убираем прошедшее время если сегодня
         if (_state.value.selectedDate == LocalDate.now().toString()) {
             val nowMin = LocalTime.now().hour * 60 + LocalTime.now().minute
             return slots.filter {
@@ -115,15 +141,24 @@ class SalonViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = s.copy(isLoading = true, error = null)
             try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
                 val r = api.createAppointment(AppointmentRequest(
                     s.clientName, s.clientPhone,
-                    s.selectedMaster!!.id, s.selectedService!!.id, startTime
+                    s.selectedMaster!!.id, s.selectedService!!.id, startTime,
+                    clientFcmToken = fcmToken
                 ))
-                if (r.isSuccessful) _state.value = _state.value.copy(isLoading = false, isSuccess = true, selectedDate = null, selectedTime = null, clientName = "", clientPhone = "")
-                else _state.value = _state.value.copy(error = "Ошибка записи", isLoading = false)
+                if (r.isSuccessful) {
+                    kotlinx.coroutines.delay(1000) // ждём 1 сек, чтобы сервер сохранил токен
+                    // Переходим на "Мои записи"
+                    loadMyAppointments()
+                } else {
+                    _state.value = _state.value.copy(error = "Ошибка записи", isLoading = false)
+                }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Ошибка: ${e.message}", isLoading = false)
             }
         }
     }
+
+    fun reset() { _state.value = ClientUiState() }
 }

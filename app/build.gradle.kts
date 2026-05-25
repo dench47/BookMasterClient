@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android") version "2.0.21"
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
+    id("com.google.gms.google-services")
 }
 android {
     namespace = "ru.bookmaster.client"
@@ -45,4 +46,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
 }

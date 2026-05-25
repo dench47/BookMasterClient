@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "169808614125",
+    "project_id": "bookmaster-b4a42",
+    "storage_bucket": "bookmaster-b4a42.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:169808614125:android:f3729635b0ae541cb932e4",
+        "android_client_info": {
+          "package_name": "ru.bookmaster.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFAe5xAZ_zLyNbLoGci6-ATZ4ZfqCa8Uw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:169808614125:android:3e0dd367dd7072a6b932e4",
+        "android_client_info": {
+          "package_name": "ru.bookmaster.client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFAe5xAZ_zLyNbLoGci6-ATZ4ZfqCa8Uw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

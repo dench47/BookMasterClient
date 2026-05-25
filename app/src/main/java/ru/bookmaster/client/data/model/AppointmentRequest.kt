@@ -5,5 +5,6 @@ data class AppointmentRequest(
     val clientPhone: String,
     val masterId: Long,
     val serviceId: Long,
-    val startTime: String
+    val startTime: String,
+    val clientFcmToken: String? = null
 )
