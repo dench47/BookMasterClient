@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -41,8 +43,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClientScreen(viewModel: SalonViewModel = viewModel()) {
+fun ClientScreen(
+    verifiedPhone: String = "",
+    viewModel: SalonViewModel = viewModel()
+) {
     val state by viewModel.state.collectAsState()
+
+    // Автозаполнение телефона после верификации
+    LaunchedEffect(verifiedPhone) {
+        if (verifiedPhone.isNotBlank()) {
+            viewModel.onPhoneChange(verifiedPhone)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -84,6 +96,15 @@ fun ClientScreen(viewModel: SalonViewModel = viewModel()) {
                                     else -> Color(0xFFFCD34D)
                                 }
                             )
+                            if (a.cancelled != true) {
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = { viewModel.cancelAppointment(a.id) },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFCA5A5))
+                                ) {
+                                    Text("Отменить")
+                                }
+                            }
                         }
                     }
                 }
@@ -167,7 +188,6 @@ fun ClientScreen(viewModel: SalonViewModel = viewModel()) {
         }
     }
 }
-
 private fun formatDate(dateTime: String): String {
     val parts = dateTime.substring(0, 10).split("-")
     return "${parts[2]}.${parts[1]}.${parts[0]}"

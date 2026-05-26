@@ -22,4 +22,9 @@ interface BookMasterClientApi {
     @GET("api/appointments/my")
     suspend fun getMyAppointments(@Header("X-Client-Token") token: String): Response<List<AppointmentResponse>>
 
+    @POST("api/appointments/{id}/cancel-by-client")
+    suspend fun cancelAppointment(
+        @Path("id") id: Long,
+        @Header("X-Client-Token") token: String
+    ): Response<Unit>
 }

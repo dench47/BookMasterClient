@@ -1,8 +1,10 @@
 package ru.bookmaster.client.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -31,10 +33,24 @@ data class ClientUiState(
     val myAppointments: List<AppointmentResponse> = emptyList()
 )
 
-class SalonViewModel : ViewModel() {
+class SalonViewModel(application: Application) : AndroidViewModel(application) {
+
     private val api = RetrofitClient.instance
+    private val app = application
     private val _state = MutableStateFlow(ClientUiState())
     val state = _state.asStateFlow()
+
+    init {
+        loadSavedClientInfo()
+    }
+
+    fun loadSavedClientInfo() {
+        val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
+        val savedName = prefs.getString("name", "")
+        val savedPhone = prefs.getString("phone", "")
+        if (!savedName.isNullOrBlank()) _state.value = _state.value.copy(clientName = savedName)
+        if (!savedPhone.isNullOrBlank()) _state.value = _state.value.copy(clientPhone = savedPhone)
+    }
 
     fun onSalonIdChange(id: String) { _state.value = _state.value.copy(salonId = id) }
     fun onNameChange(n: String) { _state.value = _state.value.copy(clientName = n) }
@@ -148,8 +164,14 @@ class SalonViewModel : ViewModel() {
                     clientFcmToken = fcmToken
                 ))
                 if (r.isSuccessful) {
-                    kotlinx.coroutines.delay(1000) // ждём 1 сек, чтобы сервер сохранил токен
-                    // Переходим на "Мои записи"
+                    // Сохраняем имя и телефон локально
+                    val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putString("name", s.clientName)
+                        .putString("phone", s.clientPhone)
+                        .apply()
+
+                    delay(1000)
                     loadMyAppointments()
                 } else {
                     _state.value = _state.value.copy(error = "Ошибка записи", isLoading = false)
@@ -157,6 +179,16 @@ class SalonViewModel : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Ошибка: ${e.message}", isLoading = false)
             }
+        }
+    }
+
+    fun cancelAppointment(id: Long) {
+        viewModelScope.launch {
+            try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await() ?: ""
+                api.cancelAppointment(id, fcmToken)
+                loadMyAppointments()
+            } catch (_: Exception) { }
         }
     }
 
