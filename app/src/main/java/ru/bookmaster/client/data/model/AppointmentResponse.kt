@@ -7,6 +7,7 @@ data class AppointmentResponse(
     val masterName: String,
     val serviceName: String,
     val startTime: String,
+    val endTime: String? = null,
     val confirmed: Boolean?,
     val cancelled: Boolean?,
     val salonName: String? = null

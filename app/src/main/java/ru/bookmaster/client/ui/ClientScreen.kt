@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,12 +34,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.net.toUri
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +51,7 @@ fun ClientScreen(
     viewModel: SalonViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
 
     // Автозаполнение телефона после верификации
     LaunchedEffect(verifiedPhone) {
@@ -96,8 +100,27 @@ fun ClientScreen(
                                     else -> Color(0xFFFCD34D)
                                 }
                             )
+                            // Кнопка "В календарь"
+                            Spacer(Modifier.height(4.dp))
+                            TextButton(onClick = {
+                                val sTime = a.startTime.take(10).replace("-", "") + "T" + a.startTime.substring(11, 16).replace(":", "") + "00"
+                                val eTime = (a.endTime ?: a.startTime).substring(0, 10).replace("-", "") + "T" + (a.endTime ?: a.startTime).substring(11, 16).replace(":", "") + "00"
+                                val title = "${a.serviceName} у ${a.masterName}"
+                                val details = "Салон: ${a.salonName ?: ""}"
+                                val url = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+                                        "&text=${java.net.URLEncoder.encode(title, "UTF-8")}" +
+                                        "&dates=$sTime/$eTime" +
+                                        "&details=${java.net.URLEncoder.encode(details, "UTF-8")}" +
+                                        "&location=${java.net.URLEncoder.encode(a.salonName ?: "", "UTF-8")}"
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                    url.toUri())
+                                context.startActivity(intent)
+                            }) {
+                                Text("📅 В календарь", color = Color(0xFF38BDF8), fontSize = 12.sp)
+                            }
+                            // Кнопка "Отменить"
                             if (a.cancelled != true) {
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(4.dp))
                                 OutlinedButton(
                                     onClick = { viewModel.cancelAppointment(a.id) },
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFCA5A5))
@@ -106,8 +129,7 @@ fun ClientScreen(
                                 }
                             }
                         }
-                    }
-                }
+                    }                }
                 Spacer(Modifier.height(16.dp))
                 OutlinedButton(viewModel::hideMyAppointments, Modifier.fillMaxWidth()) { Text("Назад") }
                 return@Column
@@ -189,6 +211,6 @@ fun ClientScreen(
     }
 }
 private fun formatDate(dateTime: String): String {
-    val parts = dateTime.substring(0, 10).split("-")
+    val parts = dateTime.take(10).split("-")
     return "${parts[2]}.${parts[1]}.${parts[0]}"
 }
