@@ -27,4 +27,17 @@ interface BookMasterClientApi {
         @Path("id") id: Long,
         @Header("X-Client-Token") token: String
     ): Response<Unit>
+
+    @GET("api/appointments/next-slot")
+    suspend fun getNextSlot(
+        @Query("salonId") salonId: Long,
+        @Query("serviceId") serviceId: Long,
+        @Query("masterId") masterId: Long?
+    ): Response<Map<String, Any>>
+
+    @GET("api/master/{id}/work-hours")
+    suspend fun getWorkHours(
+        @Path("id") masterId: Long,
+        @Query("date") date: String
+    ): Response<Map<String, String>>
 }

@@ -12,7 +12,8 @@ data class MasterDto(
     val name: String,
     val specialization: String?,
     val workStart: String?,
-    val workEnd: String?
+    val workEnd: String?,
+    val serviceIds: String? = null
 )
 
 data class ServiceDto(val id: Long, val name: String, val price: Double, val durationMinutes: Int)

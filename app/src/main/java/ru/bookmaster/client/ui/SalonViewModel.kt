@@ -15,6 +15,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.core.content.edit
 
 data class ClientUiState(
     val salonId: String = "",
@@ -30,7 +31,12 @@ data class ClientUiState(
     val error: String? = null,
     val isSuccess: Boolean = false,
     val showMyAppointments: Boolean = false,
-    val myAppointments: List<AppointmentResponse> = emptyList()
+    val myAppointments: List<AppointmentResponse> = emptyList(),
+    val showConfirm: Boolean = false,
+    val startTime: String = "",
+    val workStart: String = "09:00",
+    val workEnd: String = "18:00",
+    val loadingWorkHours: Boolean = false
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
@@ -93,11 +99,52 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectService(s: ServiceDto) { _state.value = _state.value.copy(selectedService = s, selectedDate = null, selectedTime = null) }
-    fun selectMaster(m: MasterDto) { _state.value = _state.value.copy(selectedMaster = m, selectedDate = null, selectedTime = null) }
+    fun selectMaster(m: MasterDto?) {
+        _state.value = _state.value.copy(
+            selectedMaster = m,
+            selectedDate = null,
+            selectedTime = null,
+            workStart = "09:00",
+            workEnd = "18:00"
+        )
+    }
+
     fun selectDate(date: String) {
         _state.value = _state.value.copy(selectedDate = date, selectedTime = null)
         loadSlots(date)
+        loadWorkHours(date)
     }
+
+    private fun loadWorkHours(date: String) {
+        val master = _state.value.selectedMaster ?: return
+        _state.value = _state.value.copy(loadingWorkHours = true)
+        viewModelScope.launch {
+            try {
+                val r = api.getWorkHours(master.id, date)
+                if (r.isSuccessful) {
+                    val body = r.body()!!
+                    if (body.containsKey("error")) {
+                        _state.value = _state.value.copy(
+                            workStart = "00:00",
+                            workEnd = "00:00",
+                            loadingWorkHours = false
+                        )
+                    } else {
+                        _state.value = _state.value.copy(
+                            workStart = body["workStart"] ?: "09:00",
+                            workEnd = body["workEnd"] ?: "18:00",
+                            loadingWorkHours = false
+                        )
+                    }
+                } else {
+                    _state.value = _state.value.copy(loadingWorkHours = false)
+                }
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(loadingWorkHours = false)
+            }
+        }
+    }
+
     fun selectTime(time: String) { _state.value = _state.value.copy(selectedTime = time) }
 
     private fun loadSlots(date: String) {
@@ -117,27 +164,30 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val start = if (LocalTime.now().hour >= 20) 1 else 0
         return (start..start+6).map {
             val d = now.plusDays(it.toLong())
-            "${days[d.dayOfWeek.value % 7]} ${d.dayOfMonth} ${months[d.monthValue-1]}|${d.toString()}"
+            "${days[d.dayOfWeek.value % 7]} ${d.dayOfMonth} ${months[d.monthValue-1]}|$d"
         }
     }
 
     fun getTimeSlots(): List<String> {
-        val info = _state.value.salonInfo ?: return emptyList()
-        val master = _state.value.selectedMaster ?: return emptyList()
-        val m = info.masters.find { it.id == master.id } ?: return emptyList()
-        val workStart = m.workStart?.take(5) ?: "09:00"
-        val workEnd = m.workEnd?.take(5) ?: "18:00"
+        val state = _state.value
+        state.selectedMaster ?: return emptyList()
+        val date = state.selectedDate ?: return emptyList()
+
+        val workStart = state.workStart
+        val workEnd = state.workEnd
         val startH = workStart.split(":")[0].toInt()
         val endH = workEnd.split(":")[0].toInt()
+
         val slots = mutableListOf<String>()
         for (h in startH until endH) {
             for (mnt in 0..30 step 30) {
                 val time = "${h.toString().padStart(2,'0')}:${mnt.toString().padStart(2,'0')}"
-                val full = "${_state.value.selectedDate} $time"
-                if (!_state.value.bookedSlots.any { it.startsWith(full) }) slots.add(time)
+                val full = "$date $time"
+                if (!state.bookedSlots.any { it.startsWith(full) }) slots.add(time)
             }
         }
-        if (_state.value.selectedDate == LocalDate.now().toString()) {
+
+        if (date == LocalDate.now().toString()) {
             val nowMin = LocalTime.now().hour * 60 + LocalTime.now().minute
             return slots.filter {
                 val parts = it.split(":")
@@ -166,10 +216,10 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 if (r.isSuccessful) {
                     // Сохраняем имя и телефон локально
                     val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
-                    prefs.edit()
-                        .putString("name", s.clientName)
-                        .putString("phone", s.clientPhone)
-                        .apply()
+                    prefs.edit {
+                        putString("name", s.clientName)
+                            .putString("phone", s.clientPhone)
+                    }
 
                     delay(1000)
                     loadMyAppointments()
@@ -190,6 +240,56 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 loadMyAppointments()
             } catch (_: Exception) { }
         }
+    }
+
+    fun getNextSlot() {
+        val s = _state.value
+        if (s.salonInfo == null || s.selectedService == null) return
+        viewModelScope.launch {
+            _state.value = s.copy(isLoading = true)
+            try {
+                val r = api.getNextSlot(
+                    s.salonInfo.companyId,
+                    s.selectedService.id,
+                    s.selectedMaster?.id
+                )
+                if (r.isSuccessful) {
+                    val body = r.body()!!
+                    if (body.containsKey("error")) {
+                        _state.value = s.copy(error = body["error"].toString(), isLoading = false)
+                    } else {
+                        // Сохраняем найденный слот и переходим к подтверждению
+                        _state.value = s.copy(
+                            selectedMaster = s.salonInfo.masters.find { it.id == (body["masterId"] as? Number)?.toLong() },                            selectedDate = body["date"].toString(),
+                            selectedTime = body["time"].toString(),
+                            startTime = body["startTime"].toString(),
+                            isLoading = false,
+                            showConfirm = true
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _state.value = s.copy(error = "Ошибка: ${e.message}", isLoading = false)
+            }
+        }
+    }
+
+    fun hideConfirm() {
+        _state.value = _state.value.copy(showConfirm = false,
+            selectedService = null,
+            selectedMaster = null,
+            selectedDate = null,
+            selectedTime = null)
+    }
+
+    fun backToSalon() {
+        val info = _state.value.salonInfo
+        _state.value = ClientUiState(
+            clientName = _state.value.clientName,
+            clientPhone = _state.value.clientPhone,
+            salonId = _state.value.salonId,
+            salonInfo = info
+        )
     }
 
     fun reset() { _state.value = ClientUiState() }
