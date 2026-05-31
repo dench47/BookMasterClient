@@ -199,29 +199,30 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
     fun book() {
         val s = _state.value
+        if (s.isLoading) return
         if (s.clientName.isBlank() || s.clientPhone.isBlank()) {
             _state.value = s.copy(error = "Заполните имя и телефон")
             return
         }
-        val startTime = "${s.selectedDate}T${s.selectedTime}:00"
+        val time = if (s.startTime.isNotBlank()) {
+            s.startTime.substring(0, 19)
+        } else {
+            "${s.selectedDate}T${s.selectedTime}:00"
+        }
         viewModelScope.launch {
             _state.value = s.copy(isLoading = true, error = null)
             try {
                 val fcmToken = FirebaseMessaging.getInstance().token.await()
                 val r = api.createAppointment(AppointmentRequest(
                     s.clientName, s.clientPhone,
-                    s.selectedMaster!!.id, s.selectedService!!.id, startTime,
+                    s.selectedMaster!!.id, s.selectedService!!.id, time,
                     clientFcmToken = fcmToken
                 ))
                 if (r.isSuccessful) {
-                    // Сохраняем имя и телефон локально
                     val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
-                    prefs.edit {
-                        putString("name", s.clientName)
-                            .putString("phone", s.clientPhone)
-                    }
+                    prefs.edit { putString("name", s.clientName).putString("phone", s.clientPhone) }
 
-                    delay(1000)
+                    _state.value = _state.value.copy(isLoading = false, showConfirm = false)
                     loadMyAppointments()
                 } else {
                     _state.value = _state.value.copy(error = "Ошибка записи", isLoading = false)
@@ -231,7 +232,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
     fun cancelAppointment(id: Long) {
         viewModelScope.launch {
             try {
@@ -290,6 +290,19 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             salonId = _state.value.salonId,
             salonInfo = info
         )
+    }
+
+    fun showConfirmation() {
+        val s = _state.value
+        if (s.clientName.isBlank() || s.clientPhone.isBlank()) {
+            _state.value = s.copy(error = "Заполните имя и телефон")
+            return
+        }
+        if (s.selectedService == null || s.selectedMaster == null || s.selectedDate == null || s.selectedTime == null) {
+            _state.value = s.copy(error = "Выберите услугу, мастера, дату и время")
+            return
+        }
+        _state.value = s.copy(showConfirm = true, error = null)
     }
 
     fun reset() { _state.value = ClientUiState() }

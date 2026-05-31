@@ -237,7 +237,7 @@ fun ClientScreen(
                     textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
                     modifier = Modifier.fillMaxWidth(), singleLine = true)
                 Spacer(Modifier.height(16.dp))
-                Button(viewModel::book, Modifier.fillMaxWidth().height(50.dp),
+                Button(viewModel::showConfirmation, Modifier.fillMaxWidth().height(50.dp),
                     enabled = !state.isLoading && state.selectedTime != null) {
                     Text("Записаться", fontSize = 18.sp)
                 }
