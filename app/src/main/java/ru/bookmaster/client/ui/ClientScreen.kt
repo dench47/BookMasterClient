@@ -1,8 +1,10 @@
 package ru.bookmaster.client.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,10 +18,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.net.toUri
+import androidx.compose.foundation.clickable
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -181,8 +186,7 @@ fun ClientScreen(
                 state.salonInfo!!.masters
                     .filter { m ->
                         state.selectedService == null ||
-                                m.serviceIds == null ||
-                                m.serviceIds?.split(",")?.contains(state.selectedService!!.id.toString()) == true
+                                m.serviceIds == null || m.serviceIds.split(",").contains(state.selectedService!!.id.toString())
                     }
                     .forEach { m ->
                         val sel = state.selectedMaster == m
@@ -204,15 +208,75 @@ fun ClientScreen(
                 if (state.selectedMaster != null) {
                     Spacer(Modifier.height(12.dp))
                     Text("Дата:", fontWeight = FontWeight.Bold, color = Color.White)
-                    Row(Modifier.horizontalScroll(rememberScrollState())) {
-                        viewModel.getNextDays().forEach { item ->
-                            val parts = item.split("|")
-                            FilterChip(state.selectedDate == parts[1], { viewModel.selectDate(parts[1]) },
-                                label = { Text(parts[0]) }, modifier = Modifier.padding(end = 6.dp))
+
+                    if (state.isPremium) {
+                        val monthNames = listOf("Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь")
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            TextButton(onClick = { viewModel.prevMonth() }) { Text("←", color = Color(0xFF38BDF8)) }
+                            Text("${monthNames[state.calendarMonth - 1]} ${state.calendarYear}", color = Color.White, fontWeight = FontWeight.Bold)
+                            TextButton(onClick = { viewModel.nextMonth() }) { Text("→", color = Color(0xFF38BDF8)) }
+                        }
+
+                        // Дни недели
+                        Row(Modifier.fillMaxWidth()) {
+                            listOf("Пн","Вт","Ср","Чт","Пт","Сб","Вс").forEach { d ->
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    Text(d, color = Color(0xFF94A3B8), fontSize = 11.sp)
+                                }
+                            }
+                        }
+
+                        val days = viewModel.getCalendarDays()
+                        for (i in days.indices step 7) {
+                            val week = days.subList(i, minOf(i + 7, days.size))
+                            Row(Modifier.fillMaxWidth()) {
+                                week.forEach { day ->
+                                    Box(
+                                        Modifier.weight(1f).height(40.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (!day.empty) {
+                                            Box(
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .clickable { viewModel.selectDate(day.date) },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (!day.empty) {
+                                                    if (day.enabled) {
+                                                        val isSelected = state.selectedDate == day.date
+                                                        Box(
+                                                            Modifier
+                                                                .size(36.dp)
+                                                                .then(if (isSelected) Modifier.background(Color(0xFF38BDF8), CircleShape) else Modifier),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                day.label,
+                                                                fontSize = 13.sp,
+                                                                maxLines = 1,
+                                                                color = if (isSelected) Color(0xFF0F172A) else Color.White
+                                                            )
+                                                        }
+                                                    } else {
+                                                        Text(day.label, color = Color.Gray, fontSize = 13.sp)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }                            }
+                        }
+                    } else {
+                        Row(Modifier.horizontalScroll(rememberScrollState())) {
+                            viewModel.getNextDays().forEach { item ->
+                                val parts = item.split("|")
+                                FilterChip(state.selectedDate == parts[1], { viewModel.selectDate(parts[1]) },
+                                    label = { Text(parts[0]) }, modifier = Modifier.padding(end = 6.dp))
+                            }
                         }
                     }
                 }
-
                 if (state.selectedDate != null) {
                     Spacer(Modifier.height(12.dp))
                     Text("Время:", fontWeight = FontWeight.Bold, color = Color.White)

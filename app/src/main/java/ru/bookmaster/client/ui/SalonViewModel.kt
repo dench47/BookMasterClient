@@ -36,7 +36,10 @@ data class ClientUiState(
     val startTime: String = "",
     val workStart: String = "09:00",
     val workEnd: String = "18:00",
-    val loadingWorkHours: Boolean = false
+    val loadingWorkHours: Boolean = false,
+    val isPremium: Boolean = false,
+    val calendarMonth: Int = LocalDate.now().monthValue,
+    val calendarYear: Int = LocalDate.now().year
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
@@ -90,8 +93,15 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(isLoading = true, error = null)
             try {
                 val r = api.getSalonInfo(id)
-                if (r.isSuccessful) _state.value = _state.value.copy(salonInfo = r.body(), isLoading = false)
-                else _state.value = _state.value.copy(error = "Салон не найден", isLoading = false)
+                if (r.isSuccessful) {
+                    _state.value = _state.value.copy(
+                        salonInfo = r.body(),
+                        isLoading = false,
+                        isPremium = r.body()?.isPremium ?: false
+                    )
+                } else {
+                    _state.value = _state.value.copy(error = "Салон не найден", isLoading = false)
+                }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Ошибка: ${e.message}", isLoading = false)
             }
@@ -306,4 +316,54 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun reset() { _state.value = ClientUiState() }
+
+    fun getCalendarDays(): List<CalendarDay> {
+        val year = _state.value.calendarYear
+        val month = _state.value.calendarMonth
+        val today = LocalDate.now()
+        val firstDay = LocalDate.of(year, month, 1)
+        val lastDay = firstDay.withDayOfMonth(firstDay.lengthOfMonth())
+        val startDow = if (firstDay.dayOfWeek.value == 7) 6 else firstDay.dayOfWeek.value - 1
+        val master = _state.value.selectedMaster
+        val workingDays = _state.value.salonInfo?.masters
+            ?.find { it.id == master?.id }?.workingDays ?: emptyList()
+
+        val days = mutableListOf<CalendarDay>()
+        repeat(startDow) { days.add(CalendarDay("", "", false, true)) }
+
+        var d = firstDay
+        while (!d.isAfter(lastDay)) {
+            val dateStr = d.toString()
+            val dow = listOf("Вс","Пн","Вт","Ср","Чт","Пт","Сб")[(d.dayOfWeek.value % 7)]
+            val isPast = d.isBefore(today) || (d == today && LocalTime.now().hour >= 20)
+            val isWorking = workingDays.contains(dateStr)
+            days.add(CalendarDay(dateStr, d.dayOfMonth.toString(), !isPast && isWorking, false))
+            d = d.plusDays(1)
+        }
+        while (days.size % 7 != 0) {
+            days.add(CalendarDay("", "", false, true))
+        }
+        return days
+    }
+
+    fun nextMonth() {
+        val m = _state.value.calendarMonth
+        val y = _state.value.calendarYear
+        if (m == 12) _state.value = _state.value.copy(calendarMonth = 1, calendarYear = y + 1)
+        else _state.value = _state.value.copy(calendarMonth = m + 1)
+    }
+
+    fun prevMonth() {
+        val m = _state.value.calendarMonth
+        val y = _state.value.calendarYear
+        if (m == 1) _state.value = _state.value.copy(calendarMonth = 12, calendarYear = y - 1)
+        else _state.value = _state.value.copy(calendarMonth = m - 1)
+    }
+
+    data class CalendarDay(
+        val date: String,
+        val label: String,
+        val enabled: Boolean,
+        val empty: Boolean
+    )
 }
