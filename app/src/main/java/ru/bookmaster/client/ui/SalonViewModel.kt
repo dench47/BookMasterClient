@@ -1,21 +1,24 @@
 package ru.bookmaster.client.ui
 
 import android.app.Application
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import ru.bookmaster.client.data.api.RetrofitClient
-import ru.bookmaster.client.data.model.*
+import ru.bookmaster.client.data.model.AppointmentRequest
+import ru.bookmaster.client.data.model.AppointmentResponse
+import ru.bookmaster.client.data.model.MasterDto
+import ru.bookmaster.client.data.model.SalonInfo
+import ru.bookmaster.client.data.model.ServiceDto
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import androidx.core.content.edit
 
 data class ClientUiState(
     val salonId: String = "",
@@ -215,7 +218,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val time = if (s.startTime.isNotBlank()) {
-            s.startTime.substring(0, 19)
+            s.startTime.take(minOf(19, s.startTime.length))
         } else {
             "${s.selectedDate}T${s.selectedTime}:00"
         }
