@@ -67,10 +67,21 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         if (!savedPhone.isNullOrBlank()) _state.value = _state.value.copy(clientPhone = savedPhone)
     }
 
-    fun onSalonIdChange(id: String) { _state.value = _state.value.copy(salonId = id) }
-    fun onNameChange(n: String) { _state.value = _state.value.copy(clientName = n) }
-    fun onPhoneChange(p: String) { _state.value = _state.value.copy(clientPhone = p) }
-    fun hideMyAppointments() { _state.value = _state.value.copy(showMyAppointments = false) }
+    fun onSalonIdChange(id: String) {
+        _state.value = _state.value.copy(salonId = id)
+    }
+
+    fun onNameChange(n: String) {
+        _state.value = _state.value.copy(clientName = n)
+    }
+
+    fun onPhoneChange(p: String) {
+        _state.value = _state.value.copy(clientPhone = p)
+    }
+
+    fun hideMyAppointments() {
+        _state.value = _state.value.copy(showMyAppointments = false)
+    }
 
     fun loadMyAppointments() {
         viewModelScope.launch {
@@ -80,10 +91,15 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 val r = api.getMyAppointments(fcmToken)
                 if (r.isSuccessful) {
                     val apps = r.body()?.filter {
-                        val dt = LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                        val dt =
+                            LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                         dt.isAfter(LocalDateTime.now()) && it.cancelled != true
                     } ?: emptyList()
-                    _state.value = _state.value.copy(myAppointments = apps, showMyAppointments = true, isLoading = false)
+                    _state.value = _state.value.copy(
+                        myAppointments = apps,
+                        showMyAppointments = true,
+                        isLoading = false
+                    )
                 } else {
                     _state.value = _state.value.copy(error = "Записи не найдены", isLoading = false)
                 }
@@ -114,7 +130,11 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectService(s: ServiceDto) { _state.value = _state.value.copy(selectedService = s, selectedDate = null, selectedTime = null) }
+    fun selectService(s: ServiceDto) {
+        _state.value =
+            _state.value.copy(selectedService = s, selectedDate = null, selectedTime = null)
+    }
+
     fun selectMaster(m: MasterDto?) {
         _state.value = _state.value.copy(
             selectedMaster = m,
@@ -154,8 +174,10 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                             workStart = body["workStart"]?.toString() ?: "09:00",
                             workEnd = body["workEnd"]?.toString() ?: "18:00",
                             timeStep = timeStep,
-                            stickTime = body["stickTime"]?.toString()?.toBooleanStrictOrNull() ?: false,
-                            breakAfterMinutes = (body["breakAfter"]?.toString()?.toIntOrNull() ?: 0),
+                            stickTime = body["stickTime"]?.toString()?.toBooleanStrictOrNull()
+                                ?: false,
+                            breakAfterMinutes = (body["breakAfter"]?.toString()?.toIntOrNull()
+                                ?: 0),
                             loadingWorkHours = false
                         )
                     }
@@ -168,26 +190,43 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectTime(time: String) { _state.value = _state.value.copy(selectedTime = time) }
+    fun selectTime(time: String) {
+        _state.value = _state.value.copy(selectedTime = time)
+    }
 
     private fun loadSlots(date: String) {
         val masterId = _state.value.selectedMaster?.id ?: return
         viewModelScope.launch {
             try {
                 val r = api.getBookedSlots(masterId, date)
-                if (r.isSuccessful) _state.value = _state.value.copy(bookedSlots = r.body() ?: emptyList())
-            } catch (_: Exception) { }
+                if (r.isSuccessful) _state.value =
+                    _state.value.copy(bookedSlots = r.body() ?: emptyList())
+            } catch (_: Exception) {
+            }
         }
     }
 
     fun getNextDays(): List<String> {
-        val days = listOf("Вс","Пн","Вт","Ср","Чт","Пт","Сб")
-        val months = listOf("янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек")
+        val days = listOf("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")
+        val months = listOf(
+            "янв",
+            "фев",
+            "мар",
+            "апр",
+            "мая",
+            "июн",
+            "июл",
+            "авг",
+            "сен",
+            "окт",
+            "ноя",
+            "дек"
+        )
         val now = LocalDate.now()
         val start = if (LocalTime.now().hour >= 20) 1 else 0
-        return (start..start+6).map {
+        return (start..start + 6).map {
             val d = now.plusDays(it.toLong())
-            "${days[d.dayOfWeek.value % 7]} ${d.dayOfMonth} ${months[d.monthValue-1]}|$d"
+            "${days[d.dayOfWeek.value % 7]} ${d.dayOfMonth} ${months[d.monthValue - 1]}|$d"
         }
     }
 
@@ -205,7 +244,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val startH = workStart.split(":")[0].toInt()
         val endH = workEnd.split(":")[0].toInt()
 
-        // Прилипание: вычисляем занятые минуты
         val bookedMinutes = state.bookedSlots
             .mapNotNull { bs ->
                 val parts = bs.split(" ")
@@ -219,39 +257,23 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         for (h in startH until endH) {
             var mnt = 0
             while (mnt < 60) {
-                val time = "${h.toString().padStart(2,'0')}:${mnt.toString().padStart(2,'0')}"
+                val time = "${h.toString().padStart(2, '0')}:${mnt.toString().padStart(2, '0')}"
                 val full = "$date $time"
                 val slotMin = h * 60 + mnt
                 val slotEnd = slotMin + serviceDuration
 
-                // Занятость
                 val isBooked = state.bookedSlots.any { it.startsWith(full) }
                 if (isBooked) { mnt += timeStep; continue }
 
-                // Прилипание
                 if (stickTime && bookedMinutes.isNotEmpty()) {
                     var stickOk = false
-                    val first = bookedMinutes.first()
-                    val last = bookedMinutes.last()
-
-                    // Первый слот после последней записи
-                    if (slotMin == last + 30 + breakAfter) stickOk = true
-                    // Слот до первой записи с зазором < timeStep
-                    if (slotEnd <= first && (first - slotEnd) < timeStep) stickOk = true
-                    // Между двумя
-                    for (i in 0 until bookedMinutes.size - 1) {
-                        val a = bookedMinutes[i]
-                        val b = bookedMinutes[i + 1]
-                        if (slotMin >= a + 30 + breakAfter && slotEnd <= b) {
-                            if ((slotMin - a - 30) < timeStep && (b - slotEnd) < timeStep) {
-                                stickOk = true
-                                break
-                            }
-                        }
+                    for (bm in bookedMinutes) {
+                        val bmEnd = bm + 30 // длительность записи 30 мин
+                        if (slotEnd <= bm && (bm - slotEnd) < timeStep) stickOk = true
+                        if (slotMin >= bmEnd + breakAfter && (slotMin - bmEnd - breakAfter) < timeStep) stickOk = true
                     }
                     if (!stickOk) { mnt += timeStep; continue }
                 }
-
                 slots.add(time)
                 mnt += timeStep
             }
@@ -283,13 +305,18 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = s.copy(isLoading = true, error = null)
             try {
                 val fcmToken = FirebaseMessaging.getInstance().token.await()
-                val r = api.createAppointment(AppointmentRequest(
-                    s.clientName, s.clientPhone,
-                    s.selectedMaster!!.id, s.selectedService!!.id, time,
-                    clientFcmToken = fcmToken
-                ))
+                val r = api.createAppointment(
+                    AppointmentRequest(
+                        s.clientName, s.clientPhone,
+                        s.selectedMaster!!.id, s.selectedService!!.id, time,
+                        clientFcmToken = fcmToken
+                    )
+                )
                 if (r.isSuccessful) {
-                    val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
+                    val prefs = app.getSharedPreferences(
+                        "client_info",
+                        android.content.Context.MODE_PRIVATE
+                    )
                     prefs.edit { putString("name", s.clientName).putString("phone", s.clientPhone) }
 
                     _state.value = _state.value.copy(isLoading = false, showConfirm = false)
@@ -302,13 +329,15 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
     fun cancelAppointment(id: Long) {
         viewModelScope.launch {
             try {
                 val fcmToken = FirebaseMessaging.getInstance().token.await() ?: ""
                 api.cancelAppointment(id, fcmToken)
                 loadMyAppointments()
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -330,7 +359,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         // Сохраняем найденный слот и переходим к подтверждению
                         _state.value = s.copy(
-                            selectedMaster = s.salonInfo.masters.find { it.id == (body["masterId"] as? Number)?.toLong() },                            selectedDate = body["date"].toString(),
+                            selectedMaster = s.salonInfo.masters.find { it.id == (body["masterId"] as? Number)?.toLong() },
+                            selectedDate = body["date"].toString(),
                             selectedTime = body["time"].toString(),
                             startTime = body["startTime"].toString(),
                             isLoading = false,
@@ -345,11 +375,13 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun hideConfirm() {
-        _state.value = _state.value.copy(showConfirm = false,
+        _state.value = _state.value.copy(
+            showConfirm = false,
             selectedService = null,
             selectedMaster = null,
             selectedDate = null,
-            selectedTime = null)
+            selectedTime = null
+        )
     }
 
     fun backToSalon() {
@@ -375,7 +407,9 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = s.copy(showConfirm = true, error = null)
     }
 
-    fun reset() { _state.value = ClientUiState() }
+    fun reset() {
+        _state.value = ClientUiState()
+    }
 
     fun getCalendarDays(): List<CalendarDay> {
         val year = _state.value.calendarYear
@@ -394,7 +428,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         var d = firstDay
         while (!d.isAfter(lastDay)) {
             val dateStr = d.toString()
-            val dow = listOf("Вс","Пн","Вт","Ср","Чт","Пт","Сб")[(d.dayOfWeek.value % 7)]
+            val dow = listOf("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")[(d.dayOfWeek.value % 7)]
             val isPast = d.isBefore(today) || (d == today && LocalTime.now().hour >= 20)
             val isWorking = workingDays.contains(dateStr)
             days.add(CalendarDay(dateStr, d.dayOfMonth.toString(), !isPast && isWorking, false))
