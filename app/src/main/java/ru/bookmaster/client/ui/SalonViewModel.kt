@@ -1,6 +1,8 @@
 package ru.bookmaster.client.ui
 
 import android.app.Application
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -228,6 +230,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun getTimeSlots(): List<String> {
         val state = _state.value
         state.selectedMaster ?: return emptyList()
@@ -261,12 +264,29 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 val slotMin = h * 60 + mnt
                 val slotEnd = slotMin + serviceDuration
 
-                val isBooked = state.bookedSlots.any { it.startTime.startsWith(full) }
+                val isBooked = state.bookedSlots.any { bs ->
+                    if (!bs.startTime.startsWith(full)) return@any false
+                    val bsParts = bs.startTime.split(" ")[1].split(":").map { it.toInt() }
+                    val bsStart = bsParts[0] * 60 + bsParts[1]
+                    val bsEnd = bsStart + bs.durationMinutes
+                    slotMin < bsEnd && slotEnd > bsStart
+                }
                 if (isBooked) { mnt += timeStep; continue }
 
                 if (stickTime && bookedMinutes.isNotEmpty()) {
+                    // Объединяем соседние записи в блоки
+                    val mergedBlocks = mutableListOf<Pair<Int, Int>>()
+                    for ((start, end) in bookedMinutes) {
+                        if (mergedBlocks.isEmpty() || start > mergedBlocks.last().second + breakAfter) {
+                            mergedBlocks.add(start to end)
+                        } else {
+                            val last = mergedBlocks.removeLast()
+                            mergedBlocks.add(last.first to maxOf(last.second, end))
+                        }
+                    }
+
                     var stickOk = false
-                    for ((bmStart, bmEnd) in bookedMinutes) {
+                    for ((bmStart, bmEnd) in mergedBlocks) {
                         if (slotEnd <= bmStart && (bmStart - slotEnd) < timeStep) stickOk = true
                         if (slotMin >= bmEnd + breakAfter && (slotMin - bmEnd - breakAfter) < timeStep) stickOk = true
                     }
