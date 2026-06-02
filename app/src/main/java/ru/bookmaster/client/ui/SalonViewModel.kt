@@ -42,7 +42,10 @@ data class ClientUiState(
     val loadingWorkHours: Boolean = false,
     val isPremium: Boolean = false,
     val calendarMonth: Int = LocalDate.now().monthValue,
-    val calendarYear: Int = LocalDate.now().year
+    val calendarYear: Int = LocalDate.now().year,
+    val timeStep: Int = 30,
+    val stickTime: Boolean = false,
+    val breakAfterMinutes: Int = 0
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
@@ -140,12 +143,19 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                         _state.value = _state.value.copy(
                             workStart = "00:00",
                             workEnd = "00:00",
+                            timeStep = 30,
+                            stickTime = false,
+                            breakAfterMinutes = 0,
                             loadingWorkHours = false
                         )
                     } else {
+                        val timeStep = (body["timeStep"]?.toString() ?: "30").toIntOrNull() ?: 30
                         _state.value = _state.value.copy(
-                            workStart = body["workStart"] ?: "09:00",
-                            workEnd = body["workEnd"] ?: "18:00",
+                            workStart = body["workStart"]?.toString() ?: "09:00",
+                            workEnd = body["workEnd"]?.toString() ?: "18:00",
+                            timeStep = timeStep,
+                            stickTime = body["stickTime"]?.toString()?.toBooleanStrictOrNull() ?: false,
+                            breakAfterMinutes = (body["breakAfter"]?.toString()?.toIntOrNull() ?: 0),
                             loadingWorkHours = false
                         )
                     }
@@ -188,15 +198,62 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
         val workStart = state.workStart
         val workEnd = state.workEnd
+        val timeStep = state.timeStep
+        val stickTime = state.stickTime
+        val breakAfter = state.breakAfterMinutes
+        val serviceDuration = state.selectedService?.durationMinutes ?: 30
         val startH = workStart.split(":")[0].toInt()
         val endH = workEnd.split(":")[0].toInt()
 
+        // Прилипание: вычисляем занятые минуты
+        val bookedMinutes = state.bookedSlots
+            .mapNotNull { bs ->
+                val parts = bs.split(" ")
+                if (parts.size < 2 || parts[0] != date) return@mapNotNull null
+                val t = parts[1].split(":").map { it.toInt() }
+                t[0] * 60 + t[1]
+            }
+            .sorted()
+
         val slots = mutableListOf<String>()
         for (h in startH until endH) {
-            for (mnt in 0..30 step 30) {
+            var mnt = 0
+            while (mnt < 60) {
                 val time = "${h.toString().padStart(2,'0')}:${mnt.toString().padStart(2,'0')}"
                 val full = "$date $time"
-                if (!state.bookedSlots.any { it.startsWith(full) }) slots.add(time)
+                val slotMin = h * 60 + mnt
+                val slotEnd = slotMin + serviceDuration
+
+                // Занятость
+                val isBooked = state.bookedSlots.any { it.startsWith(full) }
+                if (isBooked) { mnt += timeStep; continue }
+
+                // Прилипание
+                if (stickTime && bookedMinutes.isNotEmpty()) {
+                    var stickOk = false
+                    val first = bookedMinutes.first()
+                    val last = bookedMinutes.last()
+
+                    // Первый слот после последней записи
+                    if (slotMin == last + 30 + breakAfter) stickOk = true
+                    // Слот до первой записи с зазором < timeStep
+                    if (slotEnd <= first && (first - slotEnd) < timeStep) stickOk = true
+                    // Между двумя
+                    for (i in 0 until bookedMinutes.size - 1) {
+                        val a = bookedMinutes[i]
+                        val b = bookedMinutes[i + 1]
+                        if (slotMin >= a + 30 + breakAfter && slotEnd <= b) {
+                            if ((slotMin - a - 30) < timeStep && (b - slotEnd) < timeStep) {
+                                stickOk = true
+                                break
+                            }
+                        }
+                    }
+                    if (!stickOk) { mnt += timeStep; continue }
+                }
+
+                slots.add(time)
+                mnt += timeStep
             }
         }
 
