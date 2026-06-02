@@ -15,6 +15,7 @@ import ru.bookmaster.client.data.model.AppointmentResponse
 import ru.bookmaster.client.data.model.MasterDto
 import ru.bookmaster.client.data.model.SalonInfo
 import ru.bookmaster.client.data.model.ServiceDto
+import ru.bookmaster.client.data.model.SlotInfo
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -27,7 +28,7 @@ data class ClientUiState(
     val selectedMaster: MasterDto? = null,
     val selectedDate: String? = null,
     val selectedTime: String? = null,
-    val bookedSlots: List<String> = emptyList(),
+    val bookedSlots: List<SlotInfo> = emptyList(),
     val clientName: String = "",
     val clientPhone: String = "",
     val isLoading: Boolean = false,
@@ -169,14 +170,14 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                             loadingWorkHours = false
                         )
                     } else {
-                        val timeStep = (body["timeStep"]?.toString() ?: "30").toIntOrNull() ?: 30
+                        val timeStep = (body["timeStep"] ?: "30").toIntOrNull() ?: 30
                         _state.value = _state.value.copy(
-                            workStart = body["workStart"]?.toString() ?: "09:00",
-                            workEnd = body["workEnd"]?.toString() ?: "18:00",
+                            workStart = body["workStart"] ?: "09:00",
+                            workEnd = body["workEnd"] ?: "18:00",
                             timeStep = timeStep,
-                            stickTime = body["stickTime"]?.toString()?.toBooleanStrictOrNull()
+                            stickTime = body["stickTime"]?.toBooleanStrictOrNull()
                                 ?: false,
-                            breakAfterMinutes = (body["breakAfter"]?.toString()?.toIntOrNull()
+                            breakAfterMinutes = (body["breakAfter"]?.toIntOrNull()
                                 ?: 0),
                             loadingWorkHours = false
                         )
@@ -199,13 +200,10 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val r = api.getBookedSlots(masterId, date)
-                if (r.isSuccessful) _state.value =
-                    _state.value.copy(bookedSlots = r.body() ?: emptyList())
-            } catch (_: Exception) {
-            }
+                if (r.isSuccessful) _state.value = _state.value.copy(bookedSlots = r.body() ?: emptyList())
+            } catch (_: Exception) { }
         }
     }
-
     fun getNextDays(): List<String> {
         val days = listOf("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")
         val months = listOf(
@@ -246,12 +244,13 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
         val bookedMinutes = state.bookedSlots
             .mapNotNull { bs ->
-                val parts = bs.split(" ")
+                val parts = bs.startTime.split(" ")
                 if (parts.size < 2 || parts[0] != date) return@mapNotNull null
                 val t = parts[1].split(":").map { it.toInt() }
-                t[0] * 60 + t[1]
+                val start = t[0] * 60 + t[1]
+                start to (start + bs.durationMinutes)
             }
-            .sorted()
+            .sortedBy { it.first }
 
         val slots = mutableListOf<String>()
         for (h in startH until endH) {
@@ -262,14 +261,13 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 val slotMin = h * 60 + mnt
                 val slotEnd = slotMin + serviceDuration
 
-                val isBooked = state.bookedSlots.any { it.startsWith(full) }
+                val isBooked = state.bookedSlots.any { it.startTime.startsWith(full) }
                 if (isBooked) { mnt += timeStep; continue }
 
                 if (stickTime && bookedMinutes.isNotEmpty()) {
                     var stickOk = false
-                    for (bm in bookedMinutes) {
-                        val bmEnd = bm + 30 // длительность записи 30 мин
-                        if (slotEnd <= bm && (bm - slotEnd) < timeStep) stickOk = true
+                    for ((bmStart, bmEnd) in bookedMinutes) {
+                        if (slotEnd <= bmStart && (bmStart - slotEnd) < timeStep) stickOk = true
                         if (slotMin >= bmEnd + breakAfter && (slotMin - bmEnd - breakAfter) < timeStep) stickOk = true
                     }
                     if (!stickOk) { mnt += timeStep; continue }

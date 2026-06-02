@@ -5,6 +5,7 @@ import retrofit2.http.*
 import ru.bookmaster.client.data.model.AppointmentRequest
 import ru.bookmaster.client.data.model.AppointmentResponse
 import ru.bookmaster.client.data.model.SalonInfo
+import ru.bookmaster.client.data.model.SlotInfo
 
 interface BookMasterClientApi {
     @GET("salon/api/{salonId}")
@@ -14,8 +15,10 @@ interface BookMasterClientApi {
     suspend fun createAppointment(@Body request: AppointmentRequest): Response<Unit>
 
     @GET("api/appointments/slots/{masterId}")
-    suspend fun getBookedSlots(@Path("masterId") masterId: Long, @Query("date") date: String): Response<List<String>>
-
+    suspend fun getBookedSlots(
+        @Path("masterId") masterId: Long,
+        @Query("date") date: String
+    ): Response<List<SlotInfo>>
     @POST("api/device/register-client")
     suspend fun registerClientToken(@Body body: Map<String, String>): Response<Unit>
 
