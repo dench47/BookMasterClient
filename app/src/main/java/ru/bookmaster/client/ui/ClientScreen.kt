@@ -1,5 +1,7 @@
 package ru.bookmaster.client.ui
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -26,6 +28,7 @@ import androidx.core.net.toUri
 import androidx.compose.foundation.clickable
 
 
+@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClientScreen(
@@ -236,36 +239,29 @@ fun ClientScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (!day.empty) {
-                                            Box(
-                                                Modifier
-                                                    .fillMaxSize()
-                                                    .clickable { viewModel.selectDate(day.date) },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (!day.empty) {
-                                                    if (day.enabled) {
-                                                        val isSelected = state.selectedDate == day.date
-                                                        Box(
-                                                            Modifier
-                                                                .size(36.dp)
-                                                                .then(if (isSelected) Modifier.background(Color(0xFF38BDF8), CircleShape) else Modifier),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Text(
-                                                                day.label,
-                                                                fontSize = 13.sp,
-                                                                maxLines = 1,
-                                                                color = if (isSelected) Color(0xFF0F172A) else Color.White
-                                                            )
-                                                        }
-                                                    } else {
-                                                        Text(day.label, color = Color.Gray, fontSize = 13.sp)
-                                                    }
+                                            if (day.enabled) {
+                                                val isSelected = state.selectedDate == day.date
+                                                Box(
+                                                    Modifier
+                                                        .size(36.dp)
+                                                        .then(if (isSelected) Modifier.background(Color(0xFF38BDF8), CircleShape) else Modifier)
+                                                        .clickable { viewModel.selectDate(day.date) },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        day.label,
+                                                        fontSize = 13.sp,
+                                                        maxLines = 1,
+                                                        color = if (isSelected) Color(0xFF0F172A) else Color.White
+                                                    )
                                                 }
+                                            } else {
+                                                Text(day.label, color = Color.Gray, fontSize = 13.sp)
                                             }
                                         }
                                     }
-                                }                            }
+                                }
+                            }
                         }
                     } else {
                         Row(Modifier.horizontalScroll(rememberScrollState())) {
