@@ -43,4 +43,10 @@ interface BookMasterClientApi {
         @Path("id") masterId: Long,
         @Query("date") date: String
     ): Response<Map<String, String>>
+
+    @POST("api/verify/send")
+    suspend fun requestCallCheck(@Body body: Map<String, String>): Response<Map<String, Any>>
+
+    @POST("api/verify/check")
+    suspend fun checkCallStatus(@Body body: Map<String, String>): Response<Map<String, Any>>
 }
