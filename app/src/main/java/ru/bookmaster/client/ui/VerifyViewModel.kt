@@ -40,11 +40,15 @@ class VerifyViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     val body = response.body() ?: emptyMap()
                     if (body["status"] == "ok") {
-                        _state.value = _state.value.copy(
-                            isLoading = false,
-                            callPhone = body["call_phone"]?.toString() ?: "",
-                            isCalling = true
-                        )
+                        if (body["already_verified"] == true) {
+                            _state.value = _state.value.copy(isLoading = false, isVerified = true)
+                        } else {
+                            _state.value = _state.value.copy(
+                                isLoading = false,
+                                callPhone = body["call_phone"]?.toString() ?: "",
+                                isCalling = true
+                            )
+                        }
                     } else {
                         _state.value = _state.value.copy(
                             isLoading = false,
@@ -57,7 +61,6 @@ class VerifyViewModel : ViewModel() {
             }
         }
     }
-
     fun startChecking() {
         viewModelScope.launch {
             var attempts = 0

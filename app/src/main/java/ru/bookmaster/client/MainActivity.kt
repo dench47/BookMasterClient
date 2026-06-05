@@ -1,6 +1,7 @@
 package ru.bookmaster.client
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -37,6 +38,14 @@ class MainActivity : ComponentActivity() {
             ClientTheme {
                 var isVerified by remember { mutableStateOf(false) }
                 var verifiedPhone by remember { mutableStateOf("") }
+                val prefs = getSharedPreferences("verify_prefs", MODE_PRIVATE)
+                val alreadyVerified = prefs.getBoolean("is_verified", false)
+                val savedPhone = prefs.getString("phone", "") ?: ""
+
+                if (alreadyVerified && savedPhone.isNotBlank()) {
+                    isVerified = true
+                    verifiedPhone = savedPhone
+                }
 
                 if (!isVerified) {
                     VerifyScreen(

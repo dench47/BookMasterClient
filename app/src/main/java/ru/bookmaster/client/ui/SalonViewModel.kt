@@ -76,11 +76,15 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     fun hideMyAppointments() { _state.value = _state.value.copy(showMyAppointments = false) }
 
     fun loadMyAppointments() {
+        val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+        if (phone.length < 10) {
+            _state.value = _state.value.copy(error = "Номер не верифицирован")
+            return
+        }
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             try {
-                val fcmToken = FirebaseMessaging.getInstance().token.await() ?: ""
-                val r = api.getMyAppointments(fcmToken)
+                val r = api.getMyAppointments(phone)
                 if (r.isSuccessful) {
                     val apps = r.body()?.filter {
                         val dt = LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
