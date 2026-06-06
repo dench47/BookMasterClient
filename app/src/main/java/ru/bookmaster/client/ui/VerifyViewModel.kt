@@ -36,7 +36,7 @@ class VerifyViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             try {
-                val response = api.requestCallCheck(mapOf("phone" to phone))
+                val response = api.requestCallCheck(mapOf("phone" to phone, "type" to "client"))
                 if (response.isSuccessful) {
                     val body = response.body() ?: emptyMap()
                     if (body["status"] == "ok") {
