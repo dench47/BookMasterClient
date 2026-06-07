@@ -1,6 +1,7 @@
 package ru.bookmaster.client.ui
 
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.content.edit
@@ -48,7 +49,11 @@ data class ClientUiState(
     val calendarYear: Int = LocalDate.now().year,
     val timeStep: Int = 30,
     val stickTime: Boolean = false,
-    val bookingLimit: String = "none"
+    val bookingLimit: String = "none",
+    val showProfile: Boolean = false,
+    val showNamePrompt: Boolean = false,
+    val accountDeleted: Boolean = false,
+    val deleteError: String? = null
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
@@ -436,4 +441,45 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val enabled: Boolean,
         val empty: Boolean
     )
+
+    fun showProfile() {
+        _state.value = _state.value.copy(showMyAppointments = false, showProfile = true)
+    }
+
+    fun hideProfile() {
+        _state.value = _state.value.copy(showProfile = false)
+    }
+
+    fun showNamePrompt() {
+        _state.value = _state.value.copy(showNamePrompt = true)
+    }
+
+    fun hideNamePrompt() {
+        _state.value = _state.value.copy(showNamePrompt = false)
+    }
+
+    fun checkBeforeDelete() {
+        viewModelScope.launch {
+            try {
+                val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+                val response = api.deleteClient(phone)
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body?.get("status") == "error") {
+                        _state.value = _state.value.copy(deleteError = body["message"]?.toString())
+                    } else {
+                        // Успешно удалено
+                        val app = getApplication<Application>()
+                        app.getSharedPreferences("verify_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+                        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit().clear().apply()
+                        _state.value = _state.value.copy(accountDeleted = true)
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun clearDeleteError() {
+        _state.value = _state.value.copy(deleteError = null)
+    }
 }

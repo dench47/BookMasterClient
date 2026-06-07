@@ -92,7 +92,7 @@ fun VerifyScreen(
             Spacer(Modifier.height(8.dp))
             Text(
                 if (state.isCalling) "Позвоните на номер ниже\nи возвращайтесь в приложение"
-                else "Введите ваш номер телефона\nдля верификации",
+                else "Введите номер телефона\nдля входа или регистрации",
                 color = Color(0xFF94A3B8),
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,

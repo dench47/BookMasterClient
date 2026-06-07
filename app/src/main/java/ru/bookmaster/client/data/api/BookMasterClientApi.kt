@@ -50,6 +50,8 @@ interface BookMasterClientApi {
     @POST("api/verify/check")
     suspend fun checkCallStatus(@Body body: Map<String, String>): Response<Map<String, Any>>
 
-    @DELETE("api/client")
+    @DELETE("api/appointments/client")
     suspend fun deleteClient(@Query("phone") phone: String): Response<Map<String, Any>>
+
+
 }

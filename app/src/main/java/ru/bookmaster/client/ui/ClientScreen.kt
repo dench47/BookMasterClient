@@ -1,5 +1,7 @@
 package ru.bookmaster.client.ui
 
+import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
@@ -20,13 +22,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -42,6 +46,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,10 +58,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.core.content.edit
-
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,29 +72,56 @@ fun ClientScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
 
+    // После верификации — запрос имени
     LaunchedEffect(verifiedPhone) {
-        if (verifiedPhone.isNotBlank()) viewModel.onPhoneChange(verifiedPhone)
+        if (verifiedPhone.isNotBlank()) {
+            viewModel.onPhoneChange(verifiedPhone)
+            val prefs = context.getSharedPreferences("client_info", Context.MODE_PRIVATE)
+            val savedName = prefs.getString("name", "")
+            if (savedName.isNullOrBlank()) {
+                viewModel.showNamePrompt()
+            }
+        }
+    }
+
+    LaunchedEffect(state.accountDeleted) {
+        if (state.accountDeleted) {
+            val intent = Intent(context, context.javaClass)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            context.startActivity(intent)
+        }
     }
 
     Scaffold(
         topBar = {
+            var menuExpanded by remember { mutableStateOf(false) }
             TopAppBar(
                 title = { Text("BookMaster") },
                 actions = {
-                    if (!state.showMyAppointments) {
-                        IconButton(onClick = { viewModel.loadMyAppointments() }) {
-                            Icon(Icons.AutoMirrored.Filled.List, "Мои записи")
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Default.Menu, "Меню", tint = Color.White)
                         }
-                    }
-                    IconButton(onClick = {
-                        val prefs = context.getSharedPreferences("verify_prefs", android.content.Context.MODE_PRIVATE)
-                        prefs.edit { clear() }
-                        // Перезапускаем приложение
-                        val intent = android.content.Intent(context, context.javaClass)
-                        intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        context.startActivity(intent)
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "Выйти")
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text("📅 Мои записи") },
+                                onClick = { menuExpanded = false; viewModel.loadMyAppointments() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("👤 Профиль") },
+                                onClick = { menuExpanded = false; viewModel.showProfile() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("🚪 Выйти") },
+                                onClick = {
+                                    menuExpanded = false
+                                    context.getSharedPreferences("verify_prefs", Context.MODE_PRIVATE).edit { clear() }
+                                    val intent = Intent(context, context.javaClass)
+                                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    context.startActivity(intent)
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -97,6 +130,21 @@ fun ClientScreen(
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp).padding(bottom = 80.dp)
         ) {
+            // Экран "Как вас зовут?"
+            if (state.showNamePrompt) {
+                Text("Как вас зовут?", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(state.clientName, viewModel::onNameChange, label = { Text("Ваше имя") },
+                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = {
+                    context.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit { putString("name", state.clientName) }
+                    viewModel.hideNamePrompt()
+                }, Modifier.fillMaxWidth()) { Text("Сохранить") }
+                return@Column
+            }
+
             // Мои записи
             if (state.showMyAppointments) {
                 Text("Мои записи", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
@@ -132,11 +180,8 @@ fun ClientScreen(
                                         "&dates=$sTime/$eTime" +
                                         "&details=${java.net.URLEncoder.encode(details, "UTF-8")}" +
                                         "&location=${java.net.URLEncoder.encode(a.salonName ?: "", "UTF-8")}"
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, url.toUri())
-                                context.startActivity(intent)
-                            }) {
-                                Text("📅 В календарь", color = Color(0xFF38BDF8), fontSize = 12.sp)
-                            }
+                                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                            }) { Text("📅 В календарь", color = Color(0xFF38BDF8), fontSize = 12.sp) }
                             if (a.cancelled != true) {
                                 Spacer(Modifier.height(4.dp))
                                 OutlinedButton(
@@ -152,6 +197,67 @@ fun ClientScreen(
                 return@Column
             }
 
+            // Профиль
+            if (state.showProfile) {
+                Text("👤 Профиль", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(state.clientName, viewModel::onNameChange, label = { Text("Имя") },
+                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(state.clientPhone, viewModel::onPhoneChange, label = { Text("Телефон") },
+                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = {
+                    context.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
+                        putString("name", state.clientName)
+                        putString("phone", state.clientPhone)
+                    }
+                    viewModel.hideProfile()
+                }, Modifier.fillMaxWidth()) { Text("Сохранить") }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(viewModel::hideProfile, Modifier.fillMaxWidth()) { Text("Назад") }
+                Spacer(Modifier.height(16.dp))
+                var showDeleteDialog by remember { mutableStateOf(false) }
+
+                OutlinedButton(
+                    onClick = { showDeleteDialog = true },
+                    Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFCA5A5))
+                ) { Text("🗑 Удалить аккаунт") }
+
+                if (showDeleteDialog) {
+                    // Сначала показываем подтверждение
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = { Text("Удалить аккаунт?") },
+                        text = { Text("Все ваши данные будут удалены.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showDeleteDialog = false
+                                viewModel.checkBeforeDelete()
+                            }) { Text("Удалить", color = Color(0xFFFCA5A5)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteDialog = false }) { Text("Отмена") }
+                        }
+                    )
+                }
+
+// Если сервер вернул ошибку (активные записи)
+                if (state.deleteError != null) {
+                    AlertDialog(
+                        onDismissRequest = { viewModel.clearDeleteError() },
+                        title = { Text("Невозможно удалить") },
+                        text = { Text(state.deleteError!!) },
+                        confirmButton = {
+                            TextButton(onClick = { viewModel.clearDeleteError() }) { Text("Понятно") }
+                        }
+                    )
+                }
+                return@Column
+            }
+
             // Экран подтверждения быстрой записи
             if (state.showConfirm) {
                 Card(Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -162,22 +268,9 @@ fun ClientScreen(
                         Text("${state.selectedService?.name}. Специалист ${state.selectedMaster?.name}", color = Color(0xFF38BDF8))
                         Text("${formatDate(state.selectedDate ?: "")} в ${state.selectedTime?.take(5)}", color = Color(0xFF94A3B8))
                         Spacer(Modifier.height(12.dp))
-                        OutlinedTextField(state.clientName, viewModel::onNameChange, label = { Text("Имя") },
-                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                            modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(state.clientPhone, viewModel::onPhoneChange, label = { Text("Телефон") },
-                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                            modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        Spacer(Modifier.height(12.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = { viewModel.hideConfirm() },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Отмена") }
-                            Button(
-                                onClick = { viewModel.book() },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Подтвердить") }
+                            OutlinedButton(onClick = { viewModel.hideConfirm() }, modifier = Modifier.weight(1f)) { Text("Отмена") }
+                            Button(onClick = { viewModel.book() }, modifier = Modifier.weight(1f)) { Text("Подтвердить") }
                         }
                     }
                 }
@@ -207,7 +300,6 @@ fun ClientScreen(
                     }
                 }
 
-                // Кнопка быстрой записи
                 if (state.selectedService != null) {
                     Spacer(Modifier.height(8.dp))
                     val masterLabel = if (state.selectedMaster != null) "к ${state.selectedMaster!!.name}" else ""
@@ -238,10 +330,7 @@ fun ClientScreen(
                         }
                     }
                 if (state.selectedMaster != null) {
-                    TextButton(
-                        onClick = { viewModel.selectMaster(null) },
-                        Modifier.fillMaxWidth()
-                    ) {
+                    TextButton(onClick = { viewModel.selectMaster(null) }, Modifier.fillMaxWidth()) {
                         Text("↩ Любой мастер", color = Color(0xFF94A3B8), fontSize = 14.sp)
                     }
                 }
@@ -257,8 +346,6 @@ fun ClientScreen(
                             Text("${monthNames[state.calendarMonth - 1]} ${state.calendarYear}", color = Color.White, fontWeight = FontWeight.Bold)
                             TextButton(onClick = { viewModel.nextMonth() }) { Text("→", color = Color(0xFF38BDF8)) }
                         }
-
-                        // Дни недели
                         Row(Modifier.fillMaxWidth()) {
                             listOf("Пн","Вт","Ср","Чт","Пт","Сб","Вс").forEach { d ->
                                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -266,32 +353,23 @@ fun ClientScreen(
                                 }
                             }
                         }
-
                         val days = viewModel.getCalendarDays()
                         for (i in days.indices step 7) {
                             val week = days.subList(i, minOf(i + 7, days.size))
                             Row(Modifier.fillMaxWidth()) {
                                 week.forEach { day ->
-                                    Box(
-                                        Modifier.weight(1f).height(40.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                                    Box(Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.Center) {
                                         if (!day.empty) {
                                             if (day.enabled) {
                                                 val isSelected = state.selectedDate == day.date
                                                 Box(
-                                                    Modifier
-                                                        .size(36.dp)
+                                                    Modifier.size(36.dp)
                                                         .then(if (isSelected) Modifier.background(Color(0xFF38BDF8), CircleShape) else Modifier)
                                                         .clickable { viewModel.selectDate(day.date) },
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Text(
-                                                        day.label,
-                                                        fontSize = 13.sp,
-                                                        maxLines = 1,
-                                                        color = if (isSelected) Color(0xFF0F172A) else Color.White
-                                                    )
+                                                    Text(day.label, fontSize = 13.sp, maxLines = 1,
+                                                        color = if (isSelected) Color(0xFF0F172A) else Color.White)
                                                 }
                                             } else {
                                                 Text(day.label, color = Color.Gray, fontSize = 13.sp)
@@ -311,12 +389,12 @@ fun ClientScreen(
                         }
                     }
                 }
+
                 if (state.selectedDate != null) {
                     Spacer(Modifier.height(12.dp))
                     Text("Время:", fontWeight = FontWeight.Bold, color = Color.White)
-                    if (state.loadingWorkHours) {
-                        Text("Загрузка...", color = Color.Gray)
-                    } else {
+                    if (state.loadingWorkHours) Text("Загрузка...", color = Color.Gray)
+                    else {
                         val slots = viewModel.getTimeSlots()
                         if (slots.isEmpty()) Text("Нет свободного времени", color = Color.Gray)
                         else Row(Modifier.horizontalScroll(rememberScrollState())) {
@@ -327,14 +405,7 @@ fun ClientScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(state.clientName, viewModel::onNameChange, label = { Text("Имя") },
-                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                    modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(state.clientPhone, viewModel::onPhoneChange, label = { Text("Телефон") },
-                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                    modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Spacer(Modifier.height(16.dp))
+
                 Button(viewModel::showConfirmation, Modifier.fillMaxWidth().height(50.dp),
                     enabled = !state.isLoading && state.selectedTime != null) {
                     Text("Записаться", fontSize = 18.sp)
