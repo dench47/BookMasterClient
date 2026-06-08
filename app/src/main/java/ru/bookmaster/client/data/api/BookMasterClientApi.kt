@@ -28,7 +28,7 @@ interface BookMasterClientApi {
     @POST("api/appointments/{id}/cancel-by-client")
     suspend fun cancelAppointment(
         @Path("id") id: Long,
-        @Header("X-Client-Token") token: String
+        @Header("X-Client-Phone") phone: String
     ): Response<Unit>
 
     @GET("api/appointments/next-slot")
@@ -53,5 +53,10 @@ interface BookMasterClientApi {
     @DELETE("api/appointments/client")
     suspend fun deleteClient(@Query("phone") phone: String): Response<Map<String, Any>>
 
+    @PUT("api/clients/update-name")
+    suspend fun updateClientName(@Body body: Map<String, String>): Response<Map<String, Any>>
+
+    @GET("api/clients/by-phone")
+    suspend fun getClientByPhone(@Query("phone") phone: String): Response<Map<String, Any>>
 
 }

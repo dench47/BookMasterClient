@@ -64,9 +64,12 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     val state = _state.asStateFlow()
 
     init {
-        loadSavedClientInfo()
+        val prefs = app.getSharedPreferences("client_info", Context.MODE_PRIVATE)
+        val savedPhone = prefs.getString("phone", "")
+        if (!savedPhone.isNullOrBlank()) {
+            _state.value = _state.value.copy(clientPhone = savedPhone)
+        }
     }
-
     fun loadSavedClientInfo() {
         val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
         val savedName = prefs.getString("name", "")
@@ -75,6 +78,28 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         if (!savedPhone.isNullOrBlank()) _state.value = _state.value.copy(clientPhone = savedPhone)
     }
 
+    fun loadClientNameFromServer() {
+        val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+        if (phone.length < 10) return
+
+        viewModelScope.launch {
+            try {
+                val r = api.getClientByPhone(phone)
+                if (r.isSuccessful) {
+                    val body = r.body()
+                    val name = body?.get("name")?.toString() ?: ""
+                    if (name.isNotBlank() && name != "Клиент") {
+                        _state.value = _state.value.copy(clientName = name)
+                        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
+                            putString("name", name)
+                        }
+                    } else {
+                        showNamePrompt()
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+    }
     fun onSalonIdChange(id: String) { _state.value = _state.value.copy(salonId = id) }
     fun onNameChange(n: String) { _state.value = _state.value.copy(clientName = n) }
     fun onPhoneChange(p: String) { _state.value = _state.value.copy(clientPhone = p) }
@@ -163,7 +188,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                             workEnd = body["workEnd"] ?: "18:00",
                             timeStep = timeStep,
                             stickTime = body["stickTime"]?.toBooleanStrictOrNull() ?: false,
-                            bookingLimit = body["bookingLimit"]?.toString() ?: "none",
+                            bookingLimit = body["bookingLimit"] ?: "none",
                             loadingWorkHours = false
                         )
                     }
@@ -317,7 +342,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     clientFcmToken = fcmToken
                 ))
                 if (r.isSuccessful) {
-                    val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
+                    val prefs = app.getSharedPreferences("client_info", Context.MODE_PRIVATE)
                     prefs.edit { putString("name", s.clientName).putString("phone", s.clientPhone) }
                     _state.value = _state.value.copy(isLoading = false, showConfirm = false)
                     loadMyAppointments()
@@ -333,13 +358,14 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelAppointment(id: Long) {
         viewModelScope.launch {
             try {
-                val fcmToken = FirebaseMessaging.getInstance().token.await() ?: ""
-                api.cancelAppointment(id, fcmToken)
+                val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+                api.cancelAppointment(id, phone)
                 loadMyAppointments()
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Ошибка отмены: ${e.message}")
+            }
         }
     }
-
     fun getNextSlot() {
         val s = _state.value
         if (s.salonInfo == null || s.selectedService == null) return
@@ -454,7 +480,20 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(showNamePrompt = true)
     }
 
-    fun hideNamePrompt() {
+    fun saveName() {
+        val name = _state.value.clientName
+        if (name.isBlank()) return
+
+        viewModelScope.launch {
+            try {
+                val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+                api.updateClientName(mapOf("phone" to phone, "name" to name))
+            } catch (_: Exception) { }
+        }
+
+        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
+            putString("name", name)
+        }
         _state.value = _state.value.copy(showNamePrompt = false)
     }
 
@@ -481,5 +520,16 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearDeleteError() {
         _state.value = _state.value.copy(deleteError = null)
+    }
+
+    fun saveProfile() {
+        val s = _state.value
+        viewModelScope.launch {
+            try {
+                val phone = s.clientPhone.replace(Regex("[^0-9+]"), "")
+                api.updateClientName(mapOf("phone" to phone, "name" to s.clientName))
+            } catch (_: Exception) { }
+        }
+        _state.value = _state.value.copy(showProfile = false)
     }
 }

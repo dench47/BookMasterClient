@@ -76,11 +76,7 @@ fun ClientScreen(
     LaunchedEffect(verifiedPhone) {
         if (verifiedPhone.isNotBlank()) {
             viewModel.onPhoneChange(verifiedPhone)
-            val prefs = context.getSharedPreferences("client_info", Context.MODE_PRIVATE)
-            val savedName = prefs.getString("name", "")
-            if (savedName.isNullOrBlank()) {
-                viewModel.showNamePrompt()
-            }
+            viewModel.loadClientNameFromServer()
         }
     }
 
@@ -140,7 +136,7 @@ fun ClientScreen(
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = {
                     context.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit { putString("name", state.clientName) }
-                    viewModel.hideNamePrompt()
+                    viewModel.saveName()
                 }, Modifier.fillMaxWidth()) { Text("Сохранить") }
                 return@Column
             }
@@ -213,7 +209,7 @@ fun ClientScreen(
                         putString("name", state.clientName)
                         putString("phone", state.clientPhone)
                     }
-                    viewModel.hideProfile()
+                    viewModel.saveProfile()
                 }, Modifier.fillMaxWidth()) { Text("Сохранить") }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(viewModel::hideProfile, Modifier.fillMaxWidth()) { Text("Назад") }
