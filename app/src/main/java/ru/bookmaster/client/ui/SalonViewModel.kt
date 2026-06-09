@@ -70,6 +70,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(clientPhone = savedPhone)
         }
     }
+
     fun loadSavedClientInfo() {
         val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
         val savedName = prefs.getString("name", "")
@@ -89,6 +90,19 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     val body = r.body()
                     val name = body?.get("name")?.toString() ?: ""
                     if (name.isNotBlank() && name != "Клиент") {
+                        // Отправляем FCM токен
+                        try {
+                            val fcmToken = FirebaseMessaging.getInstance().token.await()
+                            if (fcmToken != null) {
+                                api.registerClientToken(
+                                    mapOf(
+                                        "token" to fcmToken,
+                                        "phone" to phone
+                                    )
+                                )
+                            }
+                        } catch (_: Exception) {
+                        }
                         _state.value = _state.value.copy(clientName = name)
                         app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
                             putString("name", name)
@@ -97,13 +111,26 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                         showNamePrompt()
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
-    fun onSalonIdChange(id: String) { _state.value = _state.value.copy(salonId = id) }
-    fun onNameChange(n: String) { _state.value = _state.value.copy(clientName = n) }
-    fun onPhoneChange(p: String) { _state.value = _state.value.copy(clientPhone = p) }
-    fun hideMyAppointments() { _state.value = _state.value.copy(showMyAppointments = false) }
+
+    fun onSalonIdChange(id: String) {
+        _state.value = _state.value.copy(salonId = id)
+    }
+
+    fun onNameChange(n: String) {
+        _state.value = _state.value.copy(clientName = n)
+    }
+
+    fun onPhoneChange(p: String) {
+        _state.value = _state.value.copy(clientPhone = p)
+    }
+
+    fun hideMyAppointments() {
+        _state.value = _state.value.copy(showMyAppointments = false)
+    }
 
     fun loadMyAppointments() {
         val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
@@ -117,10 +144,15 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 val r = api.getMyAppointments(phone)
                 if (r.isSuccessful) {
                     val apps = r.body()?.filter {
-                        val dt = LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                        val dt =
+                            LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                         dt.isAfter(LocalDateTime.now()) && it.cancelled != true
                     } ?: emptyList()
-                    _state.value = _state.value.copy(myAppointments = apps, showMyAppointments = true, isLoading = false)
+                    _state.value = _state.value.copy(
+                        myAppointments = apps,
+                        showMyAppointments = true,
+                        isLoading = false
+                    )
                 } else {
                     _state.value = _state.value.copy(error = "Записи не найдены", isLoading = false)
                 }
@@ -152,7 +184,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectService(s: ServiceDto) {
-        _state.value = _state.value.copy(selectedService = s, selectedDate = null, selectedTime = null)
+        _state.value =
+            _state.value.copy(selectedService = s, selectedDate = null, selectedTime = null)
     }
 
     fun selectMaster(m: MasterDto?) {
@@ -201,21 +234,38 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectTime(time: String) { _state.value = _state.value.copy(selectedTime = time) }
+    fun selectTime(time: String) {
+        _state.value = _state.value.copy(selectedTime = time)
+    }
 
     private fun loadSlots(date: String) {
         val masterId = _state.value.selectedMaster?.id ?: return
         viewModelScope.launch {
             try {
                 val r = api.getBookedSlots(masterId, date)
-                if (r.isSuccessful) _state.value = _state.value.copy(bookedSlots = r.body() ?: emptyList())
-            } catch (_: Exception) { }
+                if (r.isSuccessful) _state.value =
+                    _state.value.copy(bookedSlots = r.body() ?: emptyList())
+            } catch (_: Exception) {
+            }
         }
     }
 
     fun getNextDays(): List<String> {
-        val days = listOf("Вс","Пн","Вт","Ср","Чт","Пт","Сб")
-        val months = listOf("янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек")
+        val days = listOf("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")
+        val months = listOf(
+            "янв",
+            "фев",
+            "мар",
+            "апр",
+            "мая",
+            "июн",
+            "июл",
+            "авг",
+            "сен",
+            "окт",
+            "ноя",
+            "дек"
+        )
         val now = LocalDate.now()
         val start = if (LocalTime.now().hour >= 20) 1 else 0
         return (start..start + 6).map {
@@ -266,7 +316,9 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 val bsEnd = bsMin + bs.durationMinutes
                 slotMin < bsEnd && slotEnd > bsMin
             }
-            if (isBooked) { totalMin += timeStep; continue }
+            if (isBooked) {
+                totalMin += timeStep; continue
+            }
 
             if (stickTime && bookedMinutes.isNotEmpty()) {
                 val mergedBlocks = mutableListOf<Pair<Int, Int>>()
@@ -284,14 +336,18 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     if (slotEnd <= bmStart && (bmStart - slotEnd) < timeStep) stickOk = true
                     if (slotMin >= bmEnd && (slotMin - bmEnd) < timeStep) stickOk = true
                 }
-                if (!stickOk) { totalMin += timeStep; continue }
+                if (!stickOk) {
+                    totalMin += timeStep; continue
+                }
             }
 
             val bookingLimit = state.bookingLimit
             if (bookingLimit != "none") {
                 val now = LocalDateTime.now()
                 val maxTime: LocalDateTime? = when (bookingLimit) {
-                    "today_tomorrow" -> now.plusDays(2).withHour(0).withMinute(0).withSecond(0).withNano(0)
+                    "today_tomorrow" -> now.plusDays(2).withHour(0).withMinute(0).withSecond(0)
+                        .withNano(0)
+
                     "today" -> now.plusDays(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
                     "12h" -> now.plusHours(12)
                     "4h" -> now.plusHours(4)
@@ -301,8 +357,13 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     else -> null
                 }
                 if (maxTime != null) {
-                    val slotDateTime = LocalDateTime.parse("${date}T${time}:00", DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                    if (!slotDateTime.isAfter(maxTime)) { totalMin += timeStep; continue }
+                    val slotDateTime = LocalDateTime.parse(
+                        "${date}T${time}:00",
+                        DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                    )
+                    if (!slotDateTime.isAfter(maxTime)) {
+                        totalMin += timeStep; continue
+                    }
                 }
             }
 
@@ -336,11 +397,13 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = s.copy(isLoading = true, error = null)
             try {
                 val fcmToken = FirebaseMessaging.getInstance().token.await()
-                val r = api.createAppointment(AppointmentRequest(
-                    s.clientName, s.clientPhone,
-                    s.selectedMaster!!.id, s.selectedService!!.id, time,
-                    clientFcmToken = fcmToken
-                ))
+                val r = api.createAppointment(
+                    AppointmentRequest(
+                        s.clientName, s.clientPhone,
+                        s.selectedMaster!!.id, s.selectedService!!.id, time,
+                        clientFcmToken = fcmToken
+                    )
+                )
                 if (r.isSuccessful) {
                     val prefs = app.getSharedPreferences("client_info", Context.MODE_PRIVATE)
                     prefs.edit { putString("name", s.clientName).putString("phone", s.clientPhone) }
@@ -366,13 +429,18 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
     fun getNextSlot() {
         val s = _state.value
         if (s.salonInfo == null || s.selectedService == null) return
         viewModelScope.launch {
             _state.value = s.copy(isLoading = true)
             try {
-                val r = api.getNextSlot(s.salonInfo.companyId, s.selectedService.id, s.selectedMaster?.id)
+                val r = api.getNextSlot(
+                    s.salonInfo.companyId,
+                    s.selectedService.id,
+                    s.selectedMaster?.id
+                )
                 if (r.isSuccessful) {
                     val body = r.body()!!
                     if (body.containsKey("error")) {
@@ -395,12 +463,23 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun hideConfirm() {
-        _state.value = _state.value.copy(showConfirm = false, selectedService = null, selectedMaster = null, selectedDate = null, selectedTime = null)
+        _state.value = _state.value.copy(
+            showConfirm = false,
+            selectedService = null,
+            selectedMaster = null,
+            selectedDate = null,
+            selectedTime = null
+        )
     }
 
     fun backToSalon() {
         val info = _state.value.salonInfo
-        _state.value = ClientUiState(clientName = _state.value.clientName, clientPhone = _state.value.clientPhone, salonId = _state.value.salonId, salonInfo = info)
+        _state.value = ClientUiState(
+            clientName = _state.value.clientName,
+            clientPhone = _state.value.clientPhone,
+            salonId = _state.value.salonId,
+            salonInfo = info
+        )
     }
 
     fun showConfirmation() {
@@ -416,7 +495,9 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = s.copy(showConfirm = true, error = null)
     }
 
-    fun reset() { _state.value = ClientUiState() }
+    fun reset() {
+        _state.value = ClientUiState()
+    }
 
     fun getCalendarDays(): List<CalendarDay> {
         val year = _state.value.calendarYear
@@ -426,7 +507,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val lastDay = firstDay.withDayOfMonth(firstDay.lengthOfMonth())
         val startDow = if (firstDay.dayOfWeek.value == 7) 6 else firstDay.dayOfWeek.value - 1
         val master = _state.value.selectedMaster
-        val workingDays = _state.value.salonInfo?.masters?.find { it.id == master?.id }?.workingDays ?: emptyList()
+        val workingDays = _state.value.salonInfo?.masters?.find { it.id == master?.id }?.workingDays
+            ?: emptyList()
 
         val days = mutableListOf<CalendarDay>()
         repeat(startDow) { days.add(CalendarDay("", "", false, true)) }
@@ -488,7 +570,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
                 api.updateClientName(mapOf("phone" to phone, "name" to name))
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
 
         app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
@@ -509,12 +592,15 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         // Успешно удалено
                         val app = getApplication<Application>()
-                        app.getSharedPreferences("verify_prefs", Context.MODE_PRIVATE).edit().clear().apply()
-                        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit().clear().apply()
+                        app.getSharedPreferences("verify_prefs", Context.MODE_PRIVATE).edit()
+                            .clear().apply()
+                        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit().clear()
+                            .apply()
                         _state.value = _state.value.copy(accountDeleted = true)
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -528,7 +614,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val phone = s.clientPhone.replace(Regex("[^0-9+]"), "")
                 api.updateClientName(mapOf("phone" to phone, "name" to s.clientName))
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
         _state.value = _state.value.copy(showProfile = false)
     }

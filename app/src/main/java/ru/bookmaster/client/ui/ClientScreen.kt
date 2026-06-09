@@ -98,7 +98,9 @@ fun ClientScreen(
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(Icons.Default.Menu, "Меню", tint = Color.White)
                         }
-                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(
                                 text = { Text("📅 Мои записи") },
                                 onClick = { menuExpanded = false; viewModel.loadMyAppointments() }
@@ -111,9 +113,13 @@ fun ClientScreen(
                                 text = { Text("🚪 Выйти") },
                                 onClick = {
                                     menuExpanded = false
-                                    context.getSharedPreferences("verify_prefs", Context.MODE_PRIVATE).edit { clear() }
+                                    context.getSharedPreferences(
+                                        "verify_prefs",
+                                        Context.MODE_PRIVATE
+                                    ).edit { clear() }
                                     val intent = Intent(context, context.javaClass)
-                                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    intent.flags =
+                                        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                                     context.startActivity(intent)
                                 }
                             )
@@ -124,18 +130,30 @@ fun ClientScreen(
         }
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp).padding(bottom = 80.dp)
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+                .padding(bottom = 80.dp)
         ) {
             // Экран "Как вас зовут?"
             if (state.showNamePrompt) {
-                Text("Как вас зовут?", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                Text(
+                    "Как вас зовут?",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White
+                )
                 Spacer(Modifier.height(16.dp))
-                OutlinedTextField(state.clientName, viewModel::onNameChange, label = { Text("Ваше имя") },
+                OutlinedTextField(
+                    state.clientName, viewModel::onNameChange, label = { Text("Ваше имя") },
                     textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = {
-                    context.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit { putString("name", state.clientName) }
+                    context.getSharedPreferences("client_info", Context.MODE_PRIVATE)
+                        .edit { putString("name", state.clientName) }
                     viewModel.saveName()
                 }, Modifier.fillMaxWidth()) { Text("Сохранить") }
                 return@Column
@@ -143,16 +161,35 @@ fun ClientScreen(
 
             // Мои записи
             if (state.showMyAppointments) {
-                Text("Мои записи", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    "Мои записи",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
                 Spacer(Modifier.height(12.dp))
                 if (state.myAppointments.isEmpty()) Text("Нет активных записей", color = Color.Gray)
+                var showCancelDialog by remember { mutableStateOf<Long?>(null) }
                 state.myAppointments.forEach { a ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Card(Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(a.salonName ?: "", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
+                            Text(
+                                a.salonName ?: "",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF38BDF8)
+                            )
                             Text(a.serviceName, fontWeight = FontWeight.Bold, color = Color.White)
                             Text("Мастер: ${a.masterName}", color = Color(0xFF94A3B8))
-                            Text("Дата: ${formatDate(a.startTime)} ${a.startTime.substring(11, 16)}", color = Color(0xFF94A3B8))
+                            Text(
+                                "Дата: ${formatDate(a.startTime)} ${
+                                    a.startTime.substring(
+                                        11,
+                                        16
+                                    )
+                                }", color = Color(0xFF94A3B8)
+                            )
                             Text(
                                 when {
                                     a.cancelled == true -> "❌ Отменена"
@@ -167,42 +204,108 @@ fun ClientScreen(
                             )
                             Spacer(Modifier.height(4.dp))
                             TextButton(onClick = {
-                                val sTime = a.startTime.take(10).replace("-", "") + "T" + a.startTime.substring(11, 16).replace(":", "") + "00"
-                                val eTime = (a.endTime ?: a.startTime).substring(0, 10).replace("-", "") + "T" + (a.endTime ?: a.startTime).substring(11, 16).replace(":", "") + "00"
+                                val sTime = a.startTime.take(10)
+                                    .replace("-", "") + "T" + a.startTime.substring(11, 16)
+                                    .replace(":", "") + "00"
+                                val eTime = (a.endTime ?: a.startTime).substring(0, 10)
+                                    .replace("-", "") + "T" + (a.endTime ?: a.startTime).substring(
+                                    11,
+                                    16
+                                ).replace(":", "") + "00"
                                 val title = "${a.serviceName} у ${a.masterName}"
                                 val details = "Салон: ${a.salonName ?: ""}"
-                                val url = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
-                                        "&text=${java.net.URLEncoder.encode(title, "UTF-8")}" +
-                                        "&dates=$sTime/$eTime" +
-                                        "&details=${java.net.URLEncoder.encode(details, "UTF-8")}" +
-                                        "&location=${java.net.URLEncoder.encode(a.salonName ?: "", "UTF-8")}"
+                                val url =
+                                    "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+                                            "&text=${java.net.URLEncoder.encode(title, "UTF-8")}" +
+                                            "&dates=$sTime/$eTime" +
+                                            "&details=${
+                                                java.net.URLEncoder.encode(
+                                                    details,
+                                                    "UTF-8"
+                                                )
+                                            }" +
+                                            "&location=${
+                                                java.net.URLEncoder.encode(
+                                                    a.salonName ?: "",
+                                                    "UTF-8"
+                                                )
+                                            }"
                                 context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                            }) { Text("📅 В календарь", color = Color(0xFF38BDF8), fontSize = 12.sp) }
+                            }) {
+                                Text(
+                                    "📅 В календарь",
+                                    color = Color(0xFF38BDF8),
+                                    fontSize = 12.sp
+                                )
+                            }
                             if (a.cancelled != true) {
                                 Spacer(Modifier.height(4.dp))
+
+
+
                                 OutlinedButton(
-                                    onClick = { viewModel.cancelAppointment(a.id) },
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFCA5A5))
+                                    onClick = { showCancelDialog = a.id },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color(
+                                            0xFFFCA5A5
+                                        )
+                                    )
                                 ) { Text("Отменить") }
+
+                                // Диалог подтверждения (внутри блока showMyAppointments, перед return@Column)
+                                if (showCancelDialog != null) {
+                                    AlertDialog(
+                                        onDismissRequest = { showCancelDialog = null },
+                                        title = { Text("Отменить запись?") },
+                                        text = { Text("Вы уверены, что хотите отменить эту запись?") },
+                                        confirmButton = {
+                                            TextButton(onClick = {
+                                                showCancelDialog?.let {
+                                                    viewModel.cancelAppointment(
+                                                        it
+                                                    )
+                                                }
+                                                showCancelDialog = null
+                                            }) { Text("Отменить", color = Color(0xFFFCA5A5)) }
+                                        },
+                                        dismissButton = {
+                                            TextButton(onClick = {
+                                                showCancelDialog = null
+                                            }) { Text("Назад") }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                OutlinedButton(onClick = { viewModel.backToSalon() }, Modifier.fillMaxWidth()) { Text("Назад") }
+                OutlinedButton(
+                    onClick = { viewModel.backToSalon() },
+                    Modifier.fillMaxWidth()
+                ) { Text("Назад") }
                 return@Column
             }
 
             // Профиль
             if (state.showProfile) {
-                Text("👤 Профиль", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    "👤 Профиль",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
                 Spacer(Modifier.height(16.dp))
-                OutlinedTextField(state.clientName, viewModel::onNameChange, label = { Text("Имя") },
+                OutlinedTextField(
+                    state.clientName, viewModel::onNameChange, label = { Text("Имя") },
                     textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                    modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(state.clientPhone, viewModel::onPhoneChange, label = { Text("Телефон") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                OutlinedTextField(
+                    state.clientPhone, viewModel::onPhoneChange, label = { Text("Телефон") },
                     textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = {
                     context.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
@@ -256,17 +359,43 @@ fun ClientScreen(
 
             // Экран подтверждения быстрой записи
             if (state.showConfirm) {
-                Card(Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("⚡ Ближайшая запись", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Card(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "⚡ Ближайшая запись",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
                         Spacer(Modifier.height(8.dp))
-                        Text("${state.selectedService?.name}. Специалист ${state.selectedMaster?.name}", color = Color(0xFF38BDF8))
-                        Text("${formatDate(state.selectedDate ?: "")} в ${state.selectedTime?.take(5)}", color = Color(0xFF94A3B8))
+                        Text(
+                            "${state.selectedService?.name}. Специалист ${state.selectedMaster?.name}",
+                            color = Color(0xFF38BDF8)
+                        )
+                        Text(
+                            "${formatDate(state.selectedDate ?: "")} в ${state.selectedTime?.take(5)}",
+                            color = Color(0xFF94A3B8)
+                        )
                         Spacer(Modifier.height(12.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { viewModel.hideConfirm() }, modifier = Modifier.weight(1f)) { Text("Отмена") }
-                            Button(onClick = { viewModel.book() }, modifier = Modifier.weight(1f)) { Text("Подтвердить") }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.hideConfirm() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Отмена") }
+                            Button(
+                                onClick = { viewModel.book() },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Подтвердить") }
                         }
                     }
                 }
@@ -274,39 +403,62 @@ fun ClientScreen(
             }
 
             // Основной экран
-            OutlinedTextField(state.salonId, viewModel::onSalonIdChange, label = { Text("Код салона") },
+            OutlinedTextField(
+                state.salonId, viewModel::onSalonIdChange, label = { Text("Код салона") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 18.sp))
+                textStyle = TextStyle(color = Color.White, fontSize = 18.sp)
+            )
             Spacer(Modifier.height(8.dp))
             Button(viewModel::loadSalon, Modifier.fillMaxWidth()) { Text("Найти салон") }
 
             if (state.salonInfo != null) {
                 Spacer(Modifier.height(16.dp))
-                Text(state.salonInfo!!.companyName, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                Text(
+                    state.salonInfo!!.companyName,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White
+                )
 
                 Spacer(Modifier.height(12.dp))
                 Text("Услуга:", fontWeight = FontWeight.Bold, color = Color.White)
                 state.salonInfo!!.services.forEach { s ->
                     val sel = state.selectedService == s
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
                         colors = CardDefaults.cardColors(containerColor = if (sel) Color(0xFF38BDF8) else MaterialTheme.colorScheme.surface),
                         onClick = { viewModel.selectService(s) }) {
-                        Text("${s.name} — ${s.price} ₽ (${s.durationMinutes} мин)", Modifier.padding(10.dp), color = Color.White)
+                        Text(
+                            "${s.name} — ${s.price} ₽ (${s.durationMinutes} мин)",
+                            Modifier.padding(10.dp),
+                            color = Color.White
+                        )
                     }
                 }
 
                 if (state.selectedService != null) {
                     Spacer(Modifier.height(8.dp))
-                    val masterLabel = if (state.selectedMaster != null) "к ${state.selectedMaster!!.name}" else ""
+                    val masterLabel =
+                        if (state.selectedMaster != null) "к ${state.selectedMaster!!.name}" else ""
                     Button(
                         onClick = { viewModel.getNextSlot() },
-                        Modifier.fillMaxWidth().height(50.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
                         enabled = !state.isLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
                     ) {
-                        if (state.isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else Text("⚡ Записаться на ближайшее $masterLabel", fontSize = 16.sp, color = Color(0xFF0F172A))
+                        if (state.isLoading) CircularProgressIndicator(
+                            Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        else Text(
+                            "⚡ Записаться на ближайшее $masterLabel",
+                            fontSize = 16.sp,
+                            color = Color(0xFF0F172A)
+                        )
                     }
                 }
 
@@ -315,18 +467,31 @@ fun ClientScreen(
                 state.salonInfo!!.masters
                     .filter { m ->
                         state.selectedService == null ||
-                                m.serviceIds == null || m.serviceIds.split(",").contains(state.selectedService!!.id.toString())
+                                m.serviceIds == null || m.serviceIds.split(",")
+                            .contains(state.selectedService!!.id.toString())
                     }
                     .forEach { m ->
                         val sel = state.selectedMaster == m
-                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                            colors = CardDefaults.cardColors(containerColor = if (sel) Color(0xFF38BDF8) else MaterialTheme.colorScheme.surface),
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (sel) Color(
+                                    0xFF38BDF8
+                                ) else MaterialTheme.colorScheme.surface
+                            ),
                             onClick = { viewModel.selectMaster(m) }) {
-                            Text(m.name + (m.specialization?.let { " — $it" } ?: ""), Modifier.padding(10.dp), color = Color.White)
+                            Text(m.name + (m.specialization?.let { " — $it" } ?: ""),
+                                Modifier.padding(10.dp),
+                                color = Color.White)
                         }
                     }
                 if (state.selectedMaster != null) {
-                    TextButton(onClick = { viewModel.selectMaster(null) }, Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = { viewModel.selectMaster(null) },
+                        Modifier.fillMaxWidth()
+                    ) {
                         Text("↩ Любой мастер", color = Color(0xFF94A3B8), fontSize = 14.sp)
                     }
                 }
@@ -336,14 +501,44 @@ fun ClientScreen(
                     Text("Дата:", fontWeight = FontWeight.Bold, color = Color.White)
 
                     if (state.isPremium) {
-                        val monthNames = listOf("Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь")
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { viewModel.prevMonth() }) { Text("←", color = Color(0xFF38BDF8)) }
-                            Text("${monthNames[state.calendarMonth - 1]} ${state.calendarYear}", color = Color.White, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { viewModel.nextMonth() }) { Text("→", color = Color(0xFF38BDF8)) }
+                        val monthNames = listOf(
+                            "Январь",
+                            "Февраль",
+                            "Март",
+                            "Апрель",
+                            "Май",
+                            "Июнь",
+                            "Июль",
+                            "Август",
+                            "Сентябрь",
+                            "Октябрь",
+                            "Ноябрь",
+                            "Декабрь"
+                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            TextButton(onClick = { viewModel.prevMonth() }) {
+                                Text(
+                                    "←",
+                                    color = Color(0xFF38BDF8)
+                                )
+                            }
+                            Text(
+                                "${monthNames[state.calendarMonth - 1]} ${state.calendarYear}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                            TextButton(onClick = { viewModel.nextMonth() }) {
+                                Text(
+                                    "→",
+                                    color = Color(0xFF38BDF8)
+                                )
+                            }
                         }
                         Row(Modifier.fillMaxWidth()) {
-                            listOf("Пн","Вт","Ср","Чт","Пт","Сб","Вс").forEach { d ->
+                            listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс").forEach { d ->
                                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                                     Text(d, color = Color(0xFF94A3B8), fontSize = 11.sp)
                                 }
@@ -354,21 +549,38 @@ fun ClientScreen(
                             val week = days.subList(i, minOf(i + 7, days.size))
                             Row(Modifier.fillMaxWidth()) {
                                 week.forEach { day ->
-                                    Box(Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.Center) {
+                                    Box(
+                                        Modifier
+                                            .weight(1f)
+                                            .height(40.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
                                         if (!day.empty) {
                                             if (day.enabled) {
                                                 val isSelected = state.selectedDate == day.date
                                                 Box(
-                                                    Modifier.size(36.dp)
-                                                        .then(if (isSelected) Modifier.background(Color(0xFF38BDF8), CircleShape) else Modifier)
+                                                    Modifier
+                                                        .size(36.dp)
+                                                        .then(
+                                                            if (isSelected) Modifier.background(
+                                                                Color(0xFF38BDF8),
+                                                                CircleShape
+                                                            ) else Modifier
+                                                        )
                                                         .clickable { viewModel.selectDate(day.date) },
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Text(day.label, fontSize = 13.sp, maxLines = 1,
-                                                        color = if (isSelected) Color(0xFF0F172A) else Color.White)
+                                                    Text(
+                                                        day.label, fontSize = 13.sp, maxLines = 1,
+                                                        color = if (isSelected) Color(0xFF0F172A) else Color.White
+                                                    )
                                                 }
                                             } else {
-                                                Text(day.label, color = Color.Gray, fontSize = 13.sp)
+                                                Text(
+                                                    day.label,
+                                                    color = Color.Gray,
+                                                    fontSize = 13.sp
+                                                )
                                             }
                                         }
                                     }
@@ -379,8 +591,12 @@ fun ClientScreen(
                         Row(Modifier.horizontalScroll(rememberScrollState())) {
                             viewModel.getNextDays().forEach { item ->
                                 val parts = item.split("|")
-                                FilterChip(state.selectedDate == parts[1], { viewModel.selectDate(parts[1]) },
-                                    label = { Text(parts[0]) }, modifier = Modifier.padding(end = 6.dp))
+                                FilterChip(
+                                    state.selectedDate == parts[1],
+                                    { viewModel.selectDate(parts[1]) },
+                                    label = { Text(parts[0]) },
+                                    modifier = Modifier.padding(end = 6.dp)
+                                )
                             }
                         }
                     }
@@ -395,20 +611,30 @@ fun ClientScreen(
                         if (slots.isEmpty()) Text("Нет свободного времени", color = Color.Gray)
                         else Row(Modifier.horizontalScroll(rememberScrollState())) {
                             slots.forEach { t ->
-                                FilterChip(state.selectedTime == t, { viewModel.selectTime(t) },
-                                    label = { Text(t) }, modifier = Modifier.padding(end = 6.dp))
+                                FilterChip(
+                                    state.selectedTime == t, { viewModel.selectTime(t) },
+                                    label = { Text(t) }, modifier = Modifier.padding(end = 6.dp)
+                                )
                             }
                         }
                     }
                 }
 
-                Button(viewModel::showConfirmation, Modifier.fillMaxWidth().height(50.dp),
-                    enabled = !state.isLoading && state.selectedTime != null) {
+                Button(
+                    viewModel::showConfirmation, Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    enabled = !state.isLoading && state.selectedTime != null
+                ) {
                     Text("Записаться", fontSize = 18.sp)
                 }
             }
 
-            if (state.error != null) Text(state.error!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+            if (state.error != null) Text(
+                state.error!!,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
 }
