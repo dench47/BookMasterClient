@@ -68,7 +68,10 @@ class VerifyViewModel : ViewModel() {
                 delay(3000)
                 attempts++
                 try {
-                    val response = api.checkCallStatus(mapOf("phone" to _state.value.phone.replace(Regex("[^0-9+]"), "")))
+                    val response = api.checkCallStatus(mapOf(
+                        "phone" to _state.value.phone.replace(Regex("[^0-9+]"), ""),
+                        "type" to "client"  // ← добавить
+                    ))
                     if (response.isSuccessful) {
                         val body = response.body() ?: emptyMap()
                         if (body["verified"] == true) {
