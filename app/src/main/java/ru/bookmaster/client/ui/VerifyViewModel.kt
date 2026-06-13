@@ -81,6 +81,7 @@ class VerifyViewModel : ViewModel() {
                     }
                 } catch (_: Exception) { }
             }
+
             if (!_state.value.isVerified) {
                 _state.value = _state.value.copy(
                     isCalling = false,
