@@ -14,7 +14,8 @@ data class VerifyUiState(
     val isLoading: Boolean = false,
     val isCalling: Boolean = false,
     val isVerified: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val isServerError: Boolean = false
 )
 
 class VerifyViewModel : ViewModel() {
@@ -23,7 +24,7 @@ class VerifyViewModel : ViewModel() {
     val state = _state.asStateFlow()
 
     fun onPhoneChange(phone: String) {
-        _state.value = _state.value.copy(phone = phone, error = null)
+        _state.value = _state.value.copy(phone = phone, error = null, isServerError = false)
     }
 
     fun requestVerification() {
@@ -34,7 +35,7 @@ class VerifyViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, error = null)
+            _state.value = _state.value.copy(isLoading = true, error = null, isServerError = false)
             try {
                 val response = api.requestCallCheck(mapOf("phone" to phone, "type" to "client"))
                 if (response.isSuccessful) {
@@ -55,12 +56,34 @@ class VerifyViewModel : ViewModel() {
                             error = body["message"]?.toString() ?: "Ошибка запроса"
                         )
                     }
+                } else {
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        isServerError = true,
+                        error = "Сервер недоступен. Проверьте подключение."
+                    )
                 }
+            } catch (e: java.net.SocketTimeoutException) {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    isServerError = true,
+                    error = "Сервер не отвечает. Проверьте подключение."
+                )
+            } catch (e: java.net.ConnectException) {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    isServerError = true,
+                    error = "Нет связи с сервером. Проверьте интернет."
+                )
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isLoading = false, error = "Ошибка: ${e.message}")
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    error = "Ошибка: ${e.message}"
+                )
             }
         }
     }
+
     fun startChecking() {
         viewModelScope.launch {
             var attempts = 0
@@ -70,7 +93,7 @@ class VerifyViewModel : ViewModel() {
                 try {
                     val response = api.checkCallStatus(mapOf(
                         "phone" to _state.value.phone.replace(Regex("[^0-9+]"), ""),
-                        "type" to "client"  // ← добавить
+                        "type" to "client"
                     ))
                     if (response.isSuccessful) {
                         val body = response.body() ?: emptyMap()
@@ -79,9 +102,17 @@ class VerifyViewModel : ViewModel() {
                             return@launch
                         }
                     }
+                } catch (e: java.net.SocketTimeoutException) {
+                    // продолжаем попытки
+                } catch (e: java.net.ConnectException) {
+                    _state.value = _state.value.copy(
+                        isCalling = false,
+                        isServerError = true,
+                        error = "Сервер недоступен. Попробуйте позже."
+                    )
+                    return@launch
                 } catch (_: Exception) { }
             }
-
             if (!_state.value.isVerified) {
                 _state.value = _state.value.copy(
                     isCalling = false,

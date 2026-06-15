@@ -66,8 +66,12 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val prefs = app.getSharedPreferences("client_info", Context.MODE_PRIVATE)
         val savedPhone = prefs.getString("phone", "")
+        val savedName = prefs.getString("name", "")  // ← добавляем имя
         if (!savedPhone.isNullOrBlank()) {
             _state.value = _state.value.copy(clientPhone = savedPhone)
+        }
+        if (!savedName.isNullOrBlank()) {  // ← загружаем имя
+            _state.value = _state.value.copy(clientName = savedName)
         }
     }
 
@@ -566,6 +570,11 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val name = _state.value.clientName
         if (name.isBlank()) return
 
+        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
+            putString("name", name)
+        }
+
+
         viewModelScope.launch {
             try {
                 val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
@@ -574,9 +583,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
-            putString("name", name)
-        }
+
         _state.value = _state.value.copy(showNamePrompt = false)
     }
 
