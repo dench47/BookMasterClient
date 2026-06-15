@@ -8,6 +8,8 @@ import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -53,26 +55,48 @@ data class ClientUiState(
     val showProfile: Boolean = false,
     val showNamePrompt: Boolean = false,
     val accountDeleted: Boolean = false,
-    val deleteError: String? = null
+    val deleteError: String? = null,
+    val isServerError: Boolean = false
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
     private val api = RetrofitClient.instance
+    private val quickApi = RetrofitClient.quickInstance  // ← для быстрых запросов
+
     private val app = application
     private val _state = MutableStateFlow(ClientUiState())
     val state = _state.asStateFlow()
 
+    companion object {
+        private const val CACHE_APPOINTMENTS_KEY = "cached_appointments"
+    }
+
     init {
         val prefs = app.getSharedPreferences("client_info", Context.MODE_PRIVATE)
         val savedPhone = prefs.getString("phone", "")
-        val savedName = prefs.getString("name", "")  // ← добавляем имя
+        val savedName = prefs.getString("name", "")
         if (!savedPhone.isNullOrBlank()) {
             _state.value = _state.value.copy(clientPhone = savedPhone)
         }
-        if (!savedName.isNullOrBlank()) {  // ← загружаем имя
+        if (!savedName.isNullOrBlank()) {
             _state.value = _state.value.copy(clientName = savedName)
         }
+    }
+
+    private fun saveAppointmentsLocally(appointments: List<AppointmentResponse>) {
+        val gson = Gson()
+        val json = gson.toJson(appointments)
+        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
+            putString(CACHE_APPOINTMENTS_KEY, json)
+        }
+    }
+
+    private fun loadAppointmentsFromCache(): List<AppointmentResponse> {
+        val prefs = app.getSharedPreferences("client_info", Context.MODE_PRIVATE)
+        val json = prefs.getString(CACHE_APPOINTMENTS_KEY, null) ?: return emptyList()
+        val type = object : TypeToken<List<AppointmentResponse>>() {}.type
+        return Gson().fromJson(json, type)
     }
 
     fun loadSavedClientInfo() {
@@ -94,7 +118,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     val body = r.body()
                     val name = body?.get("name")?.toString() ?: ""
                     if (name.isNotBlank() && name != "Клиент") {
-                        // Отправляем FCM токен
                         try {
                             val fcmToken = FirebaseMessaging.getInstance().token.await()
                             if (fcmToken != null) {
@@ -133,7 +156,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun hideMyAppointments() {
-        _state.value = _state.value.copy(showMyAppointments = false)
+        _state.value = _state.value.copy(showMyAppointments = false, error = null, isServerError = false)
     }
 
     fun loadMyAppointments() {
@@ -143,25 +166,91 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, error = null)
+            _state.value = _state.value.copy(isLoading = true, error = null, isServerError = false)
             try {
-                val r = api.getMyAppointments(phone)
+                val r = quickApi.getMyAppointments(phone)
                 if (r.isSuccessful) {
                     val apps = r.body()?.filter {
-                        val dt =
-                            LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                        val dt = LocalDateTime.parse(it.startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                         dt.isAfter(LocalDateTime.now()) && it.cancelled != true
                     } ?: emptyList()
+
+                    saveAppointmentsLocally(apps)
+
                     _state.value = _state.value.copy(
                         myAppointments = apps,
                         showMyAppointments = true,
-                        isLoading = false
+                        isLoading = false,
+                        error = null,
+                        isServerError = false
                     )
                 } else {
-                    _state.value = _state.value.copy(error = "Записи не найдены", isLoading = false)
+                    val cachedApps = loadAppointmentsFromCache()
+                    if (cachedApps.isNotEmpty()) {
+                        _state.value = _state.value.copy(
+                            myAppointments = cachedApps,
+                            showMyAppointments = true,
+                            isLoading = false,
+                            error = "⚠️ Сервер недоступен. Показаны сохранённые записи.",
+                            isServerError = false
+                        )
+                    } else {
+                        _state.value = _state.value.copy(
+                            isLoading = false,
+                            error = "Нет сохранённых записей и сервер недоступен"
+                        )
+                    }
+                }
+            } catch (e: java.net.SocketTimeoutException) {
+                val cachedApps = loadAppointmentsFromCache()
+                if (cachedApps.isNotEmpty()) {
+                    _state.value = _state.value.copy(
+                        myAppointments = cachedApps,
+                        showMyAppointments = true,
+                        isLoading = false,
+                        error = "⚠️ Сервер не отвечает. Оффлайн режим",
+                        isServerError = false
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        isServerError = true,
+                        error = "Сервер не отвечает."
+                    )
+                }
+            } catch (e: java.net.ConnectException) {
+                val cachedApps = loadAppointmentsFromCache()
+                if (cachedApps.isNotEmpty()) {
+                    _state.value = _state.value.copy(
+                        myAppointments = cachedApps,
+                        showMyAppointments = true,
+                        isLoading = false,
+                        error = "⚠️ Нет связи с сервером. Оффлайн режим.",
+                        isServerError = false
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        isServerError = true,
+                        error = "Нет связи с сервером. Проверьте интернет."
+                    )
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(error = "Ошибка: ${e.message}", isLoading = false)
+                val cachedApps = loadAppointmentsFromCache()
+                if (cachedApps.isNotEmpty()) {
+                    _state.value = _state.value.copy(
+                        myAppointments = cachedApps,
+                        showMyAppointments = true,
+                        isLoading = false,
+                        error = "⚠️ Ошибка соединения. Показаны сохранённые записи.",
+                        isServerError = false
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        error = "Ошибка: ${e.message}"
+                    )
+                }
             }
         }
     }
@@ -574,7 +663,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             putString("name", name)
         }
 
-
         viewModelScope.launch {
             try {
                 val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
@@ -582,7 +670,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             } catch (_: Exception) {
             }
         }
-
 
         _state.value = _state.value.copy(showNamePrompt = false)
     }
@@ -597,7 +684,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     if (body?.get("status") == "error") {
                         _state.value = _state.value.copy(deleteError = body["message"]?.toString())
                     } else {
-                        // Успешно удалено
                         val app = getApplication<Application>()
                         app.getSharedPreferences("verify_prefs", Context.MODE_PRIVATE).edit()
                             .clear().apply()

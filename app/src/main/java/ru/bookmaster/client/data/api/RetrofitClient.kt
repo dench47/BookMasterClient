@@ -11,15 +11,40 @@ object RetrofitClient {
 //    private const val BASE_URL = "http://192.168.0.152:8080/"
     private const val BASE_URL = "http://172.25.41.231:8080/"
 
-    private val client = OkHttpClient.Builder()
-        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+    private val loggingInterceptor = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BODY
+    }
+
+    // Основной клиент для обычных запросов
+    private val okHttpClient = OkHttpClient.Builder()
+        .addInterceptor(loggingInterceptor)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
-    val instance: BookMasterClientApi = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .client(client)
-        .addConverterFactory(GsonConverterFactory.create())
+
+    // Клиент для "мои записи" с меньшим таймаутом (5 секунд)
+    private val quickOkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(loggingInterceptor)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
         .build()
-        .create(BookMasterClientApi::class.java)
+
+    val instance: BookMasterClientApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(BookMasterClientApi::class.java)
+    }
+
+    // Отдельный экземпляр для быстрых запросов
+    val quickInstance: BookMasterClientApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(quickOkHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(BookMasterClientApi::class.java)
+    }
 }
