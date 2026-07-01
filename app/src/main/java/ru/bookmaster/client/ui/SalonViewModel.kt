@@ -26,6 +26,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
+
 data class ClientUiState(
     val salonId: String = "",
     val salonInfo: SalonInfo? = null,
@@ -592,6 +593,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = ClientUiState()
     }
 
+
+
     fun getCalendarDays(): List<CalendarDay> {
         val year = _state.value.calendarYear
         val month = _state.value.calendarMonth
@@ -599,9 +602,14 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val firstDay = LocalDate.of(year, month, 1)
         val lastDay = firstDay.withDayOfMonth(firstDay.lengthOfMonth())
         val startDow = if (firstDay.dayOfWeek.value == 7) 6 else firstDay.dayOfWeek.value - 1
+
         val master = _state.value.selectedMaster
-        val workingDays = _state.value.salonInfo?.masters?.find { it.id == master?.id }?.workingDays
-            ?: emptyList()
+        // 1. Получаем шаблон недели (JSON-строка)
+        val weekTemplate = _state.value.salonInfo?.masters?.find { it.id == master?.id }?.weekScheduleTemplate
+            ?: ""
+
+        // 2. Парсим JSON-строку в Map<Int, Boolean> (день недели -> рабочий/выходной)
+        val weekDayStatus = parseWeekTemplate(weekTemplate)
 
         val days = mutableListOf<CalendarDay>()
         repeat(startDow) { days.add(CalendarDay("", "", false, true)) }
@@ -609,16 +617,42 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         var d = firstDay
         while (!d.isAfter(lastDay)) {
             val dateStr = d.toString()
+            val dayOfWeek = d.dayOfWeek.value // 1=Пн, 2=Вт ... 7=Вс
+
             val isPast = d.isBefore(today) || (d == today && LocalTime.now().hour >= 20)
-            val isWorking = workingDays.contains(dateStr)
+
+            // 3. Проверяем по шаблону: если в шаблоне нет записи или isWorking == true — день рабочий
+            val isWorking = weekDayStatus[dayOfWeek] ?: true
+
             days.add(CalendarDay(dateStr, d.dayOfMonth.toString(), !isPast && isWorking, false))
             d = d.plusDays(1)
         }
+
         while (days.size % 7 != 0) {
             days.add(CalendarDay("", "", false, true))
         }
+
         return days
     }
+
+    // 4. Вспомогательная функция для парсинга JSON-шаблона
+    private fun parseWeekTemplate(template: String): Map<Int, Boolean> {
+        if (template.isBlank()) return emptyMap()
+
+        return try {
+            val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+            val weekDays: List<Map<String, Any>> = Gson().fromJson(template, type)
+            weekDays.associate {
+                val dayOfWeek = (it["dayOfWeek"] as Number).toInt()
+                val isWorking = it["isWorking"] as Boolean
+                dayOfWeek to isWorking
+            }
+        } catch (e: Exception) {
+            emptyMap() // если шаблон битый — считаем все дни рабочими
+        }
+    }
+
+
 
     fun nextMonth() {
         val m = _state.value.calendarMonth

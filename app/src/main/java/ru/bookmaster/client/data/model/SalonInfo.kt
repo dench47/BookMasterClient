@@ -15,7 +15,9 @@ data class MasterDto(
     val workStart: String?,
     val workEnd: String?,
     val serviceIds: String? = null,
-    val workingDays: List<String>? = null
+    val workingDays: List<String>? = null,
+    val weekScheduleTemplate: String? = null // <--- ДОБАВИТЬ ЭТО
+
 )
 
 data class ServiceDto(val id: Long, val name: String, val price: Double, val durationMinutes: Int)
