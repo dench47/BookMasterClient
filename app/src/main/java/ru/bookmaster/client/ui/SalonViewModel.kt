@@ -394,8 +394,10 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             .sortedBy { it.first }
 
         val slots = mutableListOf<String>()
-        var totalMin = startH * 60
-        val endMin = endH * 60
+        val startParts = workStart.split(":").map { it.toInt() }
+        val endParts = workEnd.split(":").map { it.toInt() }
+        var totalMin = startParts[0] * 60 + startParts[1]   // ← ТАК ПРАВИЛЬНО
+        val endMin = endParts[0] * 60 + endParts[1]         // ← ТАК ПРАВИЛЬНО
         while (totalMin + serviceDuration <= endMin) {
             val h = totalMin / 60
             val m = totalMin % 60
@@ -456,7 +458,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                         "${date}T${time}:00",
                         DateTimeFormatter.ISO_LOCAL_DATE_TIME
                     )
-                    if (!slotDateTime.isAfter(maxTime)) {
+                    if (slotDateTime.isAfter(maxTime)) {
                         totalMin += timeStep; continue
                     }
                 }
