@@ -1,5 +1,6 @@
 package ru.bookmaster.client.ui
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import android.os.Build
@@ -708,6 +709,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(showNamePrompt = false)
     }
 
+    @SuppressLint("UseKtx")
     fun checkBeforeDelete() {
         viewModelScope.launch {
             try {
@@ -721,8 +723,9 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                         val app = getApplication<Application>()
                         app.getSharedPreferences("verify_prefs", Context.MODE_PRIVATE).edit()
                             .clear().apply()
-                        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit().clear()
-                            .apply()
+                        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
+                            clear()
+                        }
                         _state.value = _state.value.copy(accountDeleted = true)
                     }
                 }
