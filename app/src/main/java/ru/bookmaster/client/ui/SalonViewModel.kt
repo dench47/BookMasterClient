@@ -380,43 +380,46 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val timeStep = state.timeStep
         val stickTime = state.stickTime
         val serviceDuration = state.selectedService?.durationMinutes ?: 30
-        val startH = workStart.split(":")[0].toInt()
-        val endH = workEnd.split(":")[0].toInt()
 
+        // Парсим занятые слоты — формат может быть "yyyy-MM-dd HH:mm" или "yyyy-MM-ddTHH:mm"
         val bookedMinutes = state.bookedSlots
             .mapNotNull { bs ->
-                val parts = bs.startTime.split(" ")
+                val clean = bs.startTime.replace("T", " ")
+                val parts = clean.split(" ")
                 if (parts.size < 2 || parts[0] != date) return@mapNotNull null
-                val t = parts[1].split(":").map { it.toInt() }
-                val start = t[0] * 60 + t[1]
+                val t = parts[1].split(":").map { it.toIntOrNull() ?: 0 }
+                val start = t.getOrElse(0) { 0 } * 60 + t.getOrElse(1) { 0 }
                 start to (start + bs.durationMinutes)
             }
             .sortedBy { it.first }
 
         val slots = mutableListOf<String>()
-        val startParts = workStart.split(":").map { it.toInt() }
-        val endParts = workEnd.split(":").map { it.toInt() }
-        var totalMin = startParts[0] * 60 + startParts[1]   // ← ТАК ПРАВИЛЬНО
-        val endMin = endParts[0] * 60 + endParts[1]         // ← ТАК ПРАВИЛЬНО
+        val startParts = workStart.split(":").map { it.toIntOrNull() ?: 0 }
+        val endParts = workEnd.split(":").map { it.toIntOrNull() ?: 0 }
+        var totalMin = startParts.getOrElse(0) { 9 } * 60 + startParts.getOrElse(1) { 0 }
+        val endMin = endParts.getOrElse(0) { 18 } * 60 + endParts.getOrElse(1) { 0 }
+
         while (totalMin + serviceDuration <= endMin) {
             val h = totalMin / 60
             val m = totalMin % 60
             val time = "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
-            val full = "$date $time"
             val slotMin = totalMin
             val slotEnd = slotMin + serviceDuration
 
+            // Проверка занятости
             val isBooked = state.bookedSlots.any { bs ->
-                val bsStart = bs.startTime
-                val bsParts = bsStart.split(" ")[1].split(":").map { it.toInt() }
-                val bsMin = bsParts[0] * 60 + bsParts[1]
+                val clean = bs.startTime.replace("T", " ")
+                val bsParts = clean.split(" ").getOrElse(1) { "00:00" }.split(":").map { it.toIntOrNull() ?: 0 }
+                val bsMin = bsParts.getOrElse(0) { 0 } * 60 + bsParts.getOrElse(1) { 0 }
                 val bsEnd = bsMin + bs.durationMinutes
                 slotMin < bsEnd && slotEnd > bsMin
             }
             if (isBooked) {
-                totalMin += timeStep; continue
+                totalMin += timeStep
+                continue
             }
 
+            // Прилипание
             if (stickTime && bookedMinutes.isNotEmpty()) {
                 val mergedBlocks = mutableListOf<Pair<Int, Int>>()
                 for ((start, end) in bookedMinutes) {
@@ -434,7 +437,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     if (slotMin >= bmEnd && (slotMin - bmEnd) < timeStep) stickOk = true
                 }
                 if (!stickOk) {
-                    totalMin += timeStep; continue
+                    totalMin += timeStep
+                    continue
                 }
             }
 
@@ -442,9 +446,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             if (bookingLimit != "none") {
                 val now = LocalDateTime.now()
                 val maxTime: LocalDateTime? = when (bookingLimit) {
-                    "today_tomorrow" -> now.plusDays(2).withHour(0).withMinute(0).withSecond(0)
-                        .withNano(0)
-
+                    "today_tomorrow" -> now.plusDays(2).withHour(0).withMinute(0).withSecond(0).withNano(0)
                     "today" -> now.plusDays(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
                     "12h" -> now.plusHours(12)
                     "4h" -> now.plusHours(4)
@@ -459,7 +461,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                         DateTimeFormatter.ISO_LOCAL_DATE_TIME
                     )
                     if (slotDateTime.isAfter(maxTime)) {
-                        totalMin += timeStep; continue
+                        totalMin += timeStep
+                        continue
                     }
                 }
             }
@@ -472,12 +475,11 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             val nowMin = LocalTime.now().hour * 60 + LocalTime.now().minute
             return slots.filter {
                 val parts = it.split(":")
-                parts[0].toInt() * 60 + parts[1].toInt() > nowMin
+                parts.getOrElse(0) { "0" }.toInt() * 60 + parts.getOrElse(1) { "0" }.toInt() > nowMin
             }
         }
         return slots
     }
-
     fun book() {
         val s = _state.value
         if (s.isLoading) return
@@ -570,15 +572,19 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun backToSalon() {
-        val info = _state.value.salonInfo
+        val salonId = _state.value.salonId
+        val clientName = _state.value.clientName
+        val clientPhone = _state.value.clientPhone
         _state.value = ClientUiState(
-            clientName = _state.value.clientName,
-            clientPhone = _state.value.clientPhone,
-            salonId = _state.value.salonId,
-            salonInfo = info
+            clientName = clientName,
+            clientPhone = clientPhone,
+            salonId = salonId
         )
+        // Перезагружаем салон, чтобы обновить isPremium
+        if (salonId.isNotBlank()) {
+            loadSalon()
+        }
     }
-
     fun showConfirmation() {
         val s = _state.value
         if (s.clientName.isBlank() || s.clientPhone.isBlank()) {

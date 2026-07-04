@@ -170,114 +170,124 @@ fun ClientScreen(
                 Spacer(Modifier.height(12.dp))
                 if (state.myAppointments.isEmpty()) Text("Нет активных записей", color = Color.Gray)
                 var showCancelDialog by remember { mutableStateOf<Long?>(null) }
-                state.myAppointments.forEach { a ->
-                    Card(Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(
-                                a.salonName ?: "",
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF38BDF8)
-                            )
-                            Text(a.serviceName, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Мастер: ${a.masterName}", color = Color(0xFF94A3B8))
-                            Text(
-                                "Дата: ${formatDate(a.startTime)} ${
-                                    a.startTime.substring(
+                if (state.showMyAppointments) {
+                    Text(
+                        "Мои записи",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    if (state.myAppointments.isEmpty()) Text("Нет активных записей", color = Color.Gray)
+
+                    var showCancelDialog by remember { mutableStateOf<Long?>(null) }
+
+                    state.myAppointments.forEach { a ->
+                        Card(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(
+                                    a.salonName ?: "",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF38BDF8)
+                                )
+                                Text(a.serviceName, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("Мастер: ${a.masterName}", color = Color(0xFF94A3B8))
+                                Text(
+                                    "Дата: ${formatDate(a.startTime)} ${
+                                        a.startTime.substring(11, 16)
+                                    }", color = Color(0xFF94A3B8)
+                                )
+                                Text(
+                                    when {
+                                        a.cancelled == true -> "❌ Отменена"
+                                        a.confirmed == true -> "✅ Подтверждена"
+                                        else -> "⏳ Ожидает"
+                                    },
+                                    color = when {
+                                        a.cancelled == true -> Color(0xFFFCA5A5)
+                                        a.confirmed == true -> Color(0xFF86EFAC)
+                                        else -> Color(0xFFFCD34D)
+                                    }
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                TextButton(onClick = {
+                                    val sTime = a.startTime.take(10)
+                                        .replace("-", "") + "T" + a.startTime.substring(11, 16)
+                                        .replace(":", "") + "00"
+                                    val eTime = (a.endTime ?: a.startTime).substring(0, 10)
+                                        .replace("-", "") + "T" + (a.endTime ?: a.startTime).substring(
                                         11,
                                         16
-                                    )
-                                }", color = Color(0xFF94A3B8)
-                            )
-                            Text(
-                                when {
-                                    a.cancelled == true -> "❌ Отменена"
-                                    a.confirmed == true -> "✅ Подтверждена"
-                                    else -> "⏳ Ожидает"
-                                },
-                                color = when {
-                                    a.cancelled == true -> Color(0xFFFCA5A5)
-                                    a.confirmed == true -> Color(0xFF86EFAC)
-                                    else -> Color(0xFFFCD34D)
-                                }
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            TextButton(onClick = {
-                                val sTime = a.startTime.take(10)
-                                    .replace("-", "") + "T" + a.startTime.substring(11, 16)
-                                    .replace(":", "") + "00"
-                                val eTime = (a.endTime ?: a.startTime).substring(0, 10)
-                                    .replace("-", "") + "T" + (a.endTime ?: a.startTime).substring(
-                                    11,
-                                    16
-                                ).replace(":", "") + "00"
-                                val title = "${a.serviceName} у ${a.masterName}"
-                                val details = "Салон: ${a.salonName ?: ""}"
-                                val url =
-                                    "https://calendar.google.com/calendar/render?action=TEMPLATE" +
-                                            "&text=${java.net.URLEncoder.encode(title, "UTF-8")}" +
-                                            "&dates=$sTime/$eTime" +
-                                            "&details=${
-                                                java.net.URLEncoder.encode(
-                                                    details,
-                                                    "UTF-8"
-                                                )
-                                            }" +
-                                            "&location=${
-                                                java.net.URLEncoder.encode(
-                                                    a.salonName ?: "",
-                                                    "UTF-8"
-                                                )
-                                            }"
-                                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                            }) {
-                                Text(
-                                    "📅 В календарь",
-                                    color = Color(0xFF38BDF8),
-                                    fontSize = 12.sp
-                                )
-                            }
-                            if (a.cancelled != true) {
-                                Spacer(Modifier.height(4.dp))
-
-
-
-                                OutlinedButton(
-                                    onClick = { showCancelDialog = a.id },
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = Color(
-                                            0xFFFCA5A5
-                                        )
-                                    )
-                                ) { Text("Отменить") }
-
-                                // Диалог подтверждения (внутри блока showMyAppointments, перед return@Column)
-                                if (showCancelDialog != null) {
-                                    AlertDialog(
-                                        onDismissRequest = { showCancelDialog = null },
-                                        title = { Text("Отменить запись?") },
-                                        text = { Text("Вы уверены, что хотите отменить эту запись?") },
-                                        confirmButton = {
-                                            TextButton(onClick = {
-                                                showCancelDialog?.let {
-                                                    viewModel.cancelAppointment(
-                                                        it
+                                    ).replace(":", "") + "00"
+                                    val title = "${a.serviceName} у ${a.masterName}"
+                                    val details = "Салон: ${a.salonName ?: ""}"
+                                    val url =
+                                        "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+                                                "&text=${java.net.URLEncoder.encode(title, "UTF-8")}" +
+                                                "&dates=$sTime/$eTime" +
+                                                "&details=${
+                                                    java.net.URLEncoder.encode(
+                                                        details,
+                                                        "UTF-8"
                                                     )
-                                                }
-                                                showCancelDialog = null
-                                            }) { Text("Отменить", color = Color(0xFFFCA5A5)) }
-                                        },
-                                        dismissButton = {
-                                            TextButton(onClick = {
-                                                showCancelDialog = null
-                                            }) { Text("Назад") }
-                                        }
+                                                }" +
+                                                "&location=${
+                                                    java.net.URLEncoder.encode(
+                                                        a.salonName ?: "",
+                                                        "UTF-8"
+                                                    )
+                                                }"
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                                }) {
+                                    Text(
+                                        "📅 В календарь",
+                                        color = Color(0xFF38BDF8),
+                                        fontSize = 12.sp
                                     )
+                                }
+                                if (a.cancelled != true) {
+                                    Spacer(Modifier.height(4.dp))
+                                    OutlinedButton(
+                                        onClick = { showCancelDialog = a.id },
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color(0xFFFCA5A5)
+                                        )
+                                    ) { Text("Отменить") }
                                 }
                             }
                         }
                     }
+
+                    // Диалог подтверждения отмены — ВЫНЕСЕН ИЗ ЦИКЛА
+                    if (showCancelDialog != null) {
+                        AlertDialog(
+                            onDismissRequest = { showCancelDialog = null },
+                            title = { Text("Отменить запись?") },
+                            text = { Text("Вы уверены, что хотите отменить эту запись?") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showCancelDialog?.let { viewModel.cancelAppointment(it) }
+                                    showCancelDialog = null
+                                }) { Text("Отменить", color = Color(0xFFFCA5A5)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showCancelDialog = null }) {
+                                    Text("Назад")
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.backToSalon() },
+                        Modifier.fillMaxWidth()
+                    ) { Text("Назад") }
+                    return@Column
                 }
                 Spacer(Modifier.height(16.dp))
                 OutlinedButton(
