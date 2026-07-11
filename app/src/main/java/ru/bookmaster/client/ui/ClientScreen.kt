@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -170,18 +171,8 @@ fun ClientScreen(
                 Spacer(Modifier.height(12.dp))
                 if (state.myAppointments.isEmpty()) Text("Нет активных записей", color = Color.Gray)
                 var showCancelDialog by remember { mutableStateOf<Long?>(null) }
-                if (state.showMyAppointments) {
-                    Text(
-                        "Мои записи",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    if (state.myAppointments.isEmpty()) Text("Нет активных записей", color = Color.Gray)
 
-                    var showCancelDialog by remember { mutableStateOf<Long?>(null) }
-
+                if (state.myAppointments.isNotEmpty()) {
                     state.myAppointments.forEach { a ->
                         Card(
                             Modifier
@@ -282,12 +273,6 @@ fun ClientScreen(
                         )
                     }
 
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedButton(
-                        onClick = { viewModel.backToSalon() },
-                        Modifier.fillMaxWidth()
-                    ) { Text("Назад") }
-                    return@Column
                 }
                 Spacer(Modifier.height(16.dp))
                 OutlinedButton(
@@ -300,11 +285,30 @@ fun ClientScreen(
             // Профиль
             if (state.showProfile) {
                 Text(
-                    "👤 Профиль",
+                    "Профиль",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
+                Spacer(Modifier.height(16.dp))
+                // Аватар
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF38BDF8)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val initials = state.clientName
+                        .split(" ")
+                        .take(2).joinToString("") { it.firstOrNull()?.uppercase() ?: "" }
+                    Text(
+                        text = initials,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp
+                    )
+                }
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     state.clientName, viewModel::onNameChange, label = { Text("Имя") },
