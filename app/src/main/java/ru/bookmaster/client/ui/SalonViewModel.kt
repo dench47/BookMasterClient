@@ -38,6 +38,7 @@ data class ClientUiState(
     val bookedSlots: List<SlotInfo> = emptyList(),
     val clientName: String = "",
     val clientPhone: String = "",
+    val clientEmail: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
     val isSuccess: Boolean = false,
@@ -64,7 +65,7 @@ data class ClientUiState(
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
     private val api = RetrofitClient.instance
-    private val quickApi = RetrofitClient.quickInstance  // ← для быстрых запросов
+    private val quickApi = RetrofitClient.quickInstance
 
     private val app = application
     private val _state = MutableStateFlow(ClientUiState())
@@ -78,11 +79,15 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = app.getSharedPreferences("client_info", Context.MODE_PRIVATE)
         val savedPhone = prefs.getString("phone", "")
         val savedName = prefs.getString("name", "")
+        val savedEmail = prefs.getString("email", "")
         if (!savedPhone.isNullOrBlank()) {
             _state.value = _state.value.copy(clientPhone = savedPhone)
         }
         if (!savedName.isNullOrBlank()) {
             _state.value = _state.value.copy(clientName = savedName)
+        }
+        if (!savedEmail.isNullOrBlank()) {
+            _state.value = _state.value.copy(clientEmail = savedEmail)
         }
     }
 
@@ -105,8 +110,10 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = app.getSharedPreferences("client_info", android.content.Context.MODE_PRIVATE)
         val savedName = prefs.getString("name", "")
         val savedPhone = prefs.getString("phone", "")
+        val savedEmail = prefs.getString("email", "")
         if (!savedName.isNullOrBlank()) _state.value = _state.value.copy(clientName = savedName)
         if (!savedPhone.isNullOrBlank()) _state.value = _state.value.copy(clientPhone = savedPhone)
+        if (!savedEmail.isNullOrBlank()) _state.value = _state.value.copy(clientEmail = savedEmail)
     }
 
     fun loadClientNameFromServer() {
@@ -155,6 +162,10 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onPhoneChange(p: String) {
         _state.value = _state.value.copy(clientPhone = p)
+    }
+
+    fun onEmailChange(e: String) {
+        _state.value = _state.value.copy(clientEmail = e)
     }
 
     fun hideMyAppointments() {
@@ -381,7 +392,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val stickTime = state.stickTime
         val serviceDuration = state.selectedService?.durationMinutes ?: 30
 
-        // Парсим занятые слоты — формат может быть "yyyy-MM-dd HH:mm" или "yyyy-MM-ddTHH:mm"
         val bookedMinutes = state.bookedSlots
             .mapNotNull { bs ->
                 val clean = bs.startTime.replace("T", " ")
@@ -406,7 +416,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             val slotMin = totalMin
             val slotEnd = slotMin + serviceDuration
 
-            // Проверка занятости
             val isBooked = state.bookedSlots.any { bs ->
                 val clean = bs.startTime.replace("T", " ")
                 val bsParts = clean.split(" ").getOrElse(1) { "00:00" }.split(":").map { it.toIntOrNull() ?: 0 }
@@ -419,7 +428,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 continue
             }
 
-            // Прилипание
             if (stickTime && bookedMinutes.isNotEmpty()) {
                 val mergedBlocks = mutableListOf<Pair<Int, Int>>()
                 for ((start, end) in bookedMinutes) {
@@ -580,11 +588,11 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             clientPhone = clientPhone,
             salonId = salonId
         )
-        // Перезагружаем салон, чтобы обновить isPremium
         if (salonId.isNotBlank()) {
             loadSalon()
         }
     }
+
     fun showConfirmation() {
         val s = _state.value
         if (s.clientName.isBlank() || s.clientPhone.isBlank()) {
@@ -602,8 +610,6 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = ClientUiState()
     }
 
-
-
     fun getCalendarDays(): List<CalendarDay> {
         val year = _state.value.calendarYear
         val month = _state.value.calendarMonth
@@ -613,11 +619,9 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val startDow = if (firstDay.dayOfWeek.value == 7) 6 else firstDay.dayOfWeek.value - 1
 
         val master = _state.value.selectedMaster
-        // 1. Получаем шаблон недели (JSON-строка)
         val weekTemplate = _state.value.salonInfo?.masters?.find { it.id == master?.id }?.weekScheduleTemplate
             ?: ""
 
-        // 2. Парсим JSON-строку в Map<Int, Boolean> (день недели -> рабочий/выходной)
         val weekDayStatus = parseWeekTemplate(weekTemplate)
 
         val days = mutableListOf<CalendarDay>()
@@ -626,11 +630,9 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         var d = firstDay
         while (!d.isAfter(lastDay)) {
             val dateStr = d.toString()
-            val dayOfWeek = d.dayOfWeek.value // 1=Пн, 2=Вт ... 7=Вс
+            val dayOfWeek = d.dayOfWeek.value
 
             val isPast = d.isBefore(today) || (d == today && LocalTime.now().hour >= 20)
-
-            // 3. Проверяем по шаблону: если в шаблоне нет записи или isWorking == true — день рабочий
             val isWorking = weekDayStatus[dayOfWeek] ?: true
 
             days.add(CalendarDay(dateStr, d.dayOfMonth.toString(), !isPast && isWorking, false))
@@ -644,10 +646,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         return days
     }
 
-    // 4. Вспомогательная функция для парсинга JSON-шаблона
     private fun parseWeekTemplate(template: String): Map<Int, Boolean> {
         if (template.isBlank()) return emptyMap()
-
         return try {
             val type = object : TypeToken<List<Map<String, Any>>>() {}.type
             val weekDays: List<Map<String, Any>> = Gson().fromJson(template, type)
@@ -657,11 +657,9 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 dayOfWeek to isWorking
             }
         } catch (e: Exception) {
-            emptyMap() // если шаблон битый — считаем все дни рабочими
+            emptyMap()
         }
     }
-
-
 
     fun nextMonth() {
         val m = _state.value.calendarMonth
@@ -674,7 +672,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val m = _state.value.calendarMonth
         val y = _state.value.calendarYear
         val today = LocalDate.now()
-        if (y < today.year || (y == today.year && m <= today.monthValue)) return // нельзя в прошлое
+        if (y < today.year || (y == today.year && m <= today.monthValue)) return
         if (m == 1) _state.value = _state.value.copy(calendarMonth = 12, calendarYear = y - 1)
         else _state.value = _state.value.copy(calendarMonth = m - 1)
     }
@@ -751,9 +749,14 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val phone = s.clientPhone.replace(Regex("[^0-9+]"), "")
-                api.updateClientName(mapOf("phone" to phone, "name" to s.clientName))
+                api.updateClientName(mapOf("phone" to phone, "name" to s.clientName, "email" to s.clientEmail))
             } catch (_: Exception) {
             }
+        }
+        app.getSharedPreferences("client_info", Context.MODE_PRIVATE).edit {
+            putString("name", s.clientName)
+            putString("phone", s.clientPhone)
+            putString("email", s.clientEmail)
         }
         _state.value = _state.value.copy(showProfile = false)
     }

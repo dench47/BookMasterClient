@@ -316,6 +316,12 @@ fun ClientScreen(
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 OutlinedTextField(
+                    state.clientEmail, viewModel::onEmailChange, label = { Text("Email") },
+                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                )
+                OutlinedTextField(
                     state.clientPhone, viewModel::onPhoneChange, label = { Text("Телефон") },
                     textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
                     modifier = Modifier.fillMaxWidth(), singleLine = true
