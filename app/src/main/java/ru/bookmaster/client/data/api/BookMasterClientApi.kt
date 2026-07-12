@@ -59,4 +59,7 @@ interface BookMasterClientApi {
     @GET("api/clients/by-phone")
     suspend fun getClientByPhone(@Query("phone") phone: String): Response<Map<String, Any>>
 
+    @POST("api/waiting-list")
+    suspend fun addToWaitingList(@Body body: Map<String, Any>): Response<Map<String, Any>>
+
 }

@@ -168,6 +168,34 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(clientEmail = e)
     }
 
+    fun addToWaitingList() {
+        val s = _state.value
+        if (s.salonInfo == null || s.selectedService == null) return
+        viewModelScope.launch {
+            try {
+                val from = s.selectedDate ?: LocalDate.now().toString()
+                val to = LocalDate.now().plusDays(14).toString()
+                api.addToWaitingList(mapOf(
+                    "clientName" to s.clientName,
+                    "clientPhone" to s.clientPhone,
+                    "serviceId" to s.selectedService.id,
+                    "masterId" to (s.selectedMaster?.id ?: 0),
+                    "dateFrom" to from,
+                    "dateTo" to to,
+                    "preferredTimeOfDay" to "any"
+                ))
+                _state.value = _state.value.copy(error = null)
+                // Показываем сообщение об успехе через error (временно)
+                _state.value = _state.value.copy(
+                    error = null,
+                    showConfirm = false
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Ошибка: ${e.message}")
+            }
+        }
+    }
+
     fun hideMyAppointments() {
         _state.value = _state.value.copy(showMyAppointments = false, error = null, isServerError = false)
     }

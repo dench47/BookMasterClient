@@ -628,8 +628,16 @@ fun ClientScreen(
                     if (state.loadingWorkHours) Text("Загрузка...", color = Color.Gray)
                     else {
                         val slots = viewModel.getTimeSlots()
-                        if (slots.isEmpty()) Text("Нет свободного времени", color = Color.Gray)
-                        else Row(Modifier.horizontalScroll(rememberScrollState())) {
+                        if (slots.isEmpty()) {
+                            Text("Нет свободного времени", color = Color.Gray)
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.addToWaitingList() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("🔔 В лист ожидания")
+                            }
+                        } else Row(Modifier.horizontalScroll(rememberScrollState())) {
                             slots.forEach { t ->
                                 FilterChip(
                                     state.selectedTime == t, { viewModel.selectTime(t) },
