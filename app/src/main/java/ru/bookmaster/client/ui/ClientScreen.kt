@@ -679,6 +679,35 @@ fun ClientScreen(
                     }
                 )
             }
+
+            // Диалог подтверждения предложения из листа ожидания
+            if (state.showWaitingOffer) {
+                val offerPrefs = LocalContext.current.getSharedPreferences("waiting_offer", android.content.Context.MODE_PRIVATE)
+                val offerServiceName = offerPrefs.getString("serviceName", "") ?: ""
+                val offerMasterName = offerPrefs.getString("masterName", "") ?: ""
+                val offerDate = offerPrefs.getString("date", "") ?: ""
+                val offerTime = offerPrefs.getString("time", "") ?: ""
+
+                AlertDialog(
+                    onDismissRequest = { viewModel.hideWaitingOfferDialog() },
+                    title = { Text("📋 Свободное время!") },
+                    text = {
+                        Text(
+                            "$offerServiceName у $offerMasterName\n$offerDate в $offerTime\n\nПодтвердить запись?"
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = { viewModel.acceptWaitingOffer() }) {
+                            Text("✅ Записаться")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = { viewModel.declineWaitingOffer() }) {
+                            Text("Отказаться")
+                        }
+                    }
+                )
+            }
         }
     }
 }

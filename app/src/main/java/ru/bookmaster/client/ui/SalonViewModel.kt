@@ -60,7 +60,8 @@ data class ClientUiState(
     val accountDeleted: Boolean = false,
     val deleteError: String? = null,
     val isServerError: Boolean = false,
-    val waitingListSuccess: Boolean = false
+    val waitingListSuccess: Boolean = false,
+    val showWaitingOffer: Boolean = false
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
@@ -176,11 +177,13 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val from = s.selectedDate ?: LocalDate.now().toString()
                 val to = LocalDate.now().plusDays(14).toString()
-                api.addToWaitingList(mapOf(
+                val masterId = s.selectedMaster?.id ?: 0L
+                api.addToWaitingListClient(mapOf(
                     "clientName" to s.clientName,
                     "clientPhone" to s.clientPhone,
                     "serviceId" to s.selectedService.id.toString(),
-                    "masterId" to (s.selectedMaster?.id ?: 0).toString(),
+                    "masterId" to masterId.toString(),
+                    "companyId" to s.salonInfo!!.companyId.toString(),
                     "dateFrom" to from,
                     "dateTo" to to,
                     "preferredTimeOfDay" to "any"
@@ -807,6 +810,53 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun acceptWaitingOffer() {
+        val prefs = app.getSharedPreferences("waiting_offer", Context.MODE_PRIVATE)
+        val entryId = prefs.getLong("entryId", -1L)
+        if (entryId <= 0) return
+        viewModelScope.launch {
+            try {
+                val response = api.acceptWaitingOffer(entryId)
+                if (response.isSuccessful) {
+                    prefs.edit { clear() }
+                    _state.value = _state.value.copy(
+                        error = "✅ Запись создана! Проверьте «Мои записи».",
+                        showWaitingOffer = false
+                    )
+                } else {
+                    val errorBody = response.errorBody()?.string() ?: "Ошибка"
+                    _state.value = _state.value.copy(error = "❌ $errorBody", showWaitingOffer = false)
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "❌ ${e.message}", showWaitingOffer = false)
+            }
+        }
+    }
+
+    fun declineWaitingOffer() {
+        val prefs = app.getSharedPreferences("waiting_offer", Context.MODE_PRIVATE)
+        val entryId = prefs.getLong("entryId", -1L)
+        prefs.edit { clear() }
+        if (entryId <= 0) {
+            _state.value = _state.value.copy(showWaitingOffer = false)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                api.declineWaitingOffer(entryId)
+            } catch (_: Exception) {}
+        }
+        _state.value = _state.value.copy(showWaitingOffer = false)
+    }
+
+    fun showWaitingOfferDialog() {
+        _state.value = _state.value.copy(showWaitingOffer = true)
+    }
+
+    fun hideWaitingOfferDialog() {
+        _state.value = _state.value.copy(showWaitingOffer = false)
     }
 
     fun saveProfile() {

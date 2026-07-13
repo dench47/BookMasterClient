@@ -26,20 +26,58 @@ class ClientMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        // Проверяем, что уведомление адресовано текущему пользователю
         val data = message.data
         val type = data["type"] ?: ""
         val clientPhone = data["clientPhone"] ?: ""
 
-        // Только уведомления типа CLIENT_APPOINTMENT проверяем на принадлежность
-        if (type == "CLIENT_APPOINTMENT" && clientPhone.isNotBlank()) {
+        // Проверка принадлежности уведомления текущему пользователю
+        if (clientPhone.isNotBlank() && (type == "CLIENT_APPOINTMENT" || type == "WAITING_LIST_OFFER")) {
             val currentPhone = getSharedPreferences("verify_prefs", MODE_PRIVATE)
                 .getString("phone", "")?.replace(Regex("[^0-9+]"), "") ?: ""
             val msgPhone = clientPhone.replace(Regex("[^0-9+]"), "")
             if (currentPhone.isBlank() || currentPhone != msgPhone) {
-                // Уведомление не для текущего пользователя — игнорируем
-                return
+                return // Уведомление не для текущего пользователя
             }
+        }
+
+        // Для WAITING_LIST_OFFER — сохраняем данные о предложении и показываем уведомление
+        if (type == "WAITING_LIST_OFFER") {
+            val entryId = data["entryId"]?.toLongOrNull() ?: return
+            val offerDate = data["date"] ?: ""
+            val offerTime = data["time"] ?: ""
+            val serviceName = data["serviceName"] ?: ""
+            val masterName = data["masterName"] ?: ""
+
+            // Сохраняем данные предложения для последующего подтверждения в UI
+            getSharedPreferences("waiting_offer", MODE_PRIVATE).edit {
+                putLong("entryId", entryId)
+                putString("date", offerDate)
+                putString("time", offerTime)
+                putString("serviceName", serviceName)
+                putString("masterName", masterName)
+            }
+
+            val title = data["title"] ?: "📋 Появилось свободное время!"
+            val body = data["body"] ?: "$serviceName у $masterName • $offerDate $offerTime"
+
+            val intent = android.content.Intent(this, ru.bookmaster.client.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("showWaitingOffer", true)
+            }
+            val pendingIntent = android.app.PendingIntent.getActivity(
+                this, 0, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val n = android.app.Notification.Builder(this, "client_reminders")
+                .setContentTitle(title)
+                .setContentText(body)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+            getSystemService(NotificationManager::class.java).notify(System.currentTimeMillis().toInt(), n)
+            return
         }
 
         val title = data["title"] ?: message.notification?.title ?: "BookMaster"
