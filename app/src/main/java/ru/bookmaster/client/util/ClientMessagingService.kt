@@ -26,9 +26,24 @@ class ClientMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        // Сначала пробуем data-поля (сервер отправляет только data, без Notification)
-        val title = message.data["title"] ?: message.notification?.title ?: "BookMaster"
-        val body = message.data["body"] ?: message.notification?.body ?: ""
+        // Проверяем, что уведомление адресовано текущему пользователю
+        val data = message.data
+        val type = data["type"] ?: ""
+        val clientPhone = data["clientPhone"] ?: ""
+
+        // Только уведомления типа CLIENT_APPOINTMENT проверяем на принадлежность
+        if (type == "CLIENT_APPOINTMENT" && clientPhone.isNotBlank()) {
+            val currentPhone = getSharedPreferences("verify_prefs", MODE_PRIVATE)
+                .getString("phone", "")?.replace(Regex("[^0-9+]"), "") ?: ""
+            val msgPhone = clientPhone.replace(Regex("[^0-9+]"), "")
+            if (currentPhone.isBlank() || currentPhone != msgPhone) {
+                // Уведомление не для текущего пользователя — игнорируем
+                return
+            }
+        }
+
+        val title = data["title"] ?: message.notification?.title ?: "BookMaster"
+        val body = data["body"] ?: message.notification?.body ?: ""
 
         val n = android.app.Notification.Builder(this, "client_reminders")
             .setContentTitle(title)

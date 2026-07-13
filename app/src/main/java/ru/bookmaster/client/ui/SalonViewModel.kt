@@ -59,7 +59,8 @@ data class ClientUiState(
     val showNamePrompt: Boolean = false,
     val accountDeleted: Boolean = false,
     val deleteError: String? = null,
-    val isServerError: Boolean = false
+    val isServerError: Boolean = false,
+    val waitingListSuccess: Boolean = false
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
@@ -178,16 +179,14 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 api.addToWaitingList(mapOf(
                     "clientName" to s.clientName,
                     "clientPhone" to s.clientPhone,
-                    "serviceId" to s.selectedService.id,
-                    "masterId" to (s.selectedMaster?.id ?: 0),
+                    "serviceId" to s.selectedService.id.toString(),
+                    "masterId" to (s.selectedMaster?.id ?: 0).toString(),
                     "dateFrom" to from,
                     "dateTo" to to,
                     "preferredTimeOfDay" to "any"
                 ))
-                _state.value = _state.value.copy(error = null)
-                // Показываем сообщение об успехе через error (временно)
                 _state.value = _state.value.copy(
-                    error = null,
+                    waitingListSuccess = true,
                     showConfirm = false
                 )
             } catch (e: Exception) {
@@ -770,6 +769,44 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearDeleteError() {
         _state.value = _state.value.copy(deleteError = null)
+    }
+
+    fun clearWaitingListSuccess() {
+        _state.value = _state.value.copy(waitingListSuccess = false)
+    }
+
+    fun registerFcmToken(phone: String) {
+        viewModelScope.launch {
+            try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
+                if (fcmToken != null) {
+                    api.registerClientToken(mapOf("token" to fcmToken, "phone" to phone))
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun unregisterClientToken() {
+        viewModelScope.launch {
+            val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+            // Очищаем локальный токен немедленно, чтобы MessagingService не перерегистрировал
+            app.getSharedPreferences("client_prefs", Context.MODE_PRIVATE).edit {
+                remove("fcm_token")
+            }
+            // Пытаемся удалить токен на сервере с повторными попытками
+            var attempts = 0
+            while (attempts < 3) {
+                try {
+                    api.unregisterClient(phone)
+                    break
+                } catch (_: Exception) {
+                    attempts++
+                    if (attempts < 3) {
+                        kotlinx.coroutines.delay(1000L * attempts)
+                    }
+                }
+            }
+        }
     }
 
     fun saveProfile() {

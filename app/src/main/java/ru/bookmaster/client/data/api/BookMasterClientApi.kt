@@ -60,6 +60,9 @@ interface BookMasterClientApi {
     suspend fun getClientByPhone(@Query("phone") phone: String): Response<Map<String, Any>>
 
     @POST("api/waiting-list")
-    suspend fun addToWaitingList(@Body body: Map<String, Any>): Response<Map<String, Any>>
+    suspend fun addToWaitingList(@Body body: Map<String, String>): Response<Map<String, String>>
+
+    @DELETE("api/device/unregister-client")
+    suspend fun unregisterClient(@Query("phone") phone: String): Response<Unit>
 
 }

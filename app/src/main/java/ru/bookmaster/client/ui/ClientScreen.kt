@@ -77,6 +77,7 @@ fun ClientScreen(
     LaunchedEffect(verifiedPhone) {
         if (verifiedPhone.isNotBlank()) {
             viewModel.onPhoneChange(verifiedPhone)
+            viewModel.registerFcmToken(verifiedPhone)
             viewModel.loadClientNameFromServer()
         }
     }
@@ -114,6 +115,7 @@ fun ClientScreen(
                                 text = { Text("🚪 Выйти") },
                                 onClick = {
                                     menuExpanded = false
+                                    viewModel.unregisterClientToken()
                                     context.getSharedPreferences(
                                         "verify_prefs",
                                         Context.MODE_PRIVATE
@@ -663,6 +665,20 @@ fun ClientScreen(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 8.dp)
             )
+
+            // Лист ожидания — диалог успеха
+            if (state.waitingListSuccess) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.clearWaitingListSuccess() },
+                    title = { Text("✅ Добавлено") },
+                    text = { Text("Вы добавлены в лист ожидания.\nМы уведомим вас, когда появится свободное время.") },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.clearWaitingListSuccess() }) {
+                            Text("ОК")
+                        }
+                    }
+                )
+            }
         }
     }
 }
