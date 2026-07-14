@@ -42,6 +42,9 @@ class MainActivity : ComponentActivity() {
                 val alreadyVerified = prefs.getBoolean("is_verified", false)
                 val savedPhone = prefs.getString("phone", "") ?: ""
 
+                // Проверяем, пришли ли мы по уведомлению из листа ожидания
+                val showWaitingOffer = intent?.getBooleanExtra("showWaitingOffer", false) ?: false
+
                 if (alreadyVerified && savedPhone.isNotBlank()) {
                     isVerified = true
                     verifiedPhone = savedPhone
@@ -55,7 +58,7 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    ClientScreen(verifiedPhone = verifiedPhone)
+                    ClientScreen(verifiedPhone = verifiedPhone, showWaitingOffer = showWaitingOffer)
                 }
             }
         }
