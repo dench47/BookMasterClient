@@ -17,11 +17,19 @@ import ru.bookmaster.client.ui.VerifyScreen
 import ru.bookmaster.client.ui.theme.ClientTheme
 
 class MainActivity : ComponentActivity() {
-    // Состояние, доступное для обновления из onNewIntent
-    private var pendingShowWaitingOffer by mutableStateOf(false)
+    // Версия — при каждом FCM увеличивается, чтобы LaunchedEffect перезапускался
+    private var pendingShowWaitingOfferVersion by mutableStateOf(0)
+
+    companion object {
+        @Volatile
+        var isForeground = false
+            private set
+    }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Восстанавливаем версию после поворота экрана
+        pendingShowWaitingOfferVersion = savedInstanceState?.getInt("offer_version", 0) ?: 0
         super.onCreate(savedInstanceState)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -62,10 +70,20 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    ClientScreen(verifiedPhone = verifiedPhone, showWaitingOffer = pendingShowWaitingOffer)
+                    ClientScreen(verifiedPhone = verifiedPhone, showWaitingOfferVersion = pendingShowWaitingOfferVersion)
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isForeground = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isForeground = false
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -73,9 +91,14 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt("offer_version", pendingShowWaitingOfferVersion)
+    }
+
     private fun handleIntent(intent: Intent?) {
         if (intent?.getBooleanExtra("showWaitingOffer", false) == true) {
-            pendingShowWaitingOffer = true
+            pendingShowWaitingOfferVersion++
             intent.removeExtra("showWaitingOffer") // чтобы при повороте экрана не срабатывало повторно
         }
     }

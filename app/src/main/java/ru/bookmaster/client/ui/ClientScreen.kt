@@ -70,7 +70,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun ClientScreen(
     verifiedPhone: String = "",
-    showWaitingOffer: Boolean = false,
+    showWaitingOfferVersion: Int = 0,
     viewModel: SalonViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -86,9 +86,14 @@ fun ClientScreen(
     }
 
     // Если пришли по уведомлению из листа ожидания — показываем диалог
-    LaunchedEffect(showWaitingOffer) {
-        if (showWaitingOffer) {
+    LaunchedEffect(showWaitingOfferVersion) {
+        if (showWaitingOfferVersion > 0) {
             viewModel.showWaitingOfferDialog()
+            // Вибрация при показе диалога
+            try {
+                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                vibrator.vibrate(android.os.VibrationEffect.createOneShot(300, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+            } catch (_: Exception) {}
         }
     }
 
@@ -766,7 +771,7 @@ fun ClientScreen(
                 val offerTime = offerPrefs.getString("time", "") ?: ""
 
                 AlertDialog(
-                    onDismissRequest = { viewModel.hideWaitingOfferDialog() },
+                    onDismissRequest = { /* диалог нельзя закрыть кликом мимо */ },
                     title = { Text("📋 Свободное время!") },
                     text = {
                         Text(

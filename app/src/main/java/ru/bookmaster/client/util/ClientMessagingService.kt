@@ -57,33 +57,37 @@ class ClientMessagingService : FirebaseMessagingService() {
                 putString("masterName", masterName)
             }
 
-            // Сначала показываем системное уведомление — работает всегда (foreground/background/killed)
-            val title = data["title"] ?: "📋 Появилось свободное время!"
-            val body = data["body"] ?: "$serviceName у $masterName • $offerDate $offerTime"
-
             val foregroundIntent = android.content.Intent(this, ru.bookmaster.client.MainActivity::class.java).apply {
                 flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("showWaitingOffer", true)
             }
 
-            val pendingIntent = android.app.PendingIntent.getActivity(
-                this, 0, foregroundIntent,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-            )
+            if (ru.bookmaster.client.MainActivity.isForeground) {
+                // Приложение на переднем плане — диалог + вибрация, без системного уведомления
+                try {
+                    startActivity(foregroundIntent)
+                    val vibrator = getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(300, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                } catch (_: Exception) {}
+            } else {
+                // Приложение в фоне/закрыто — только системное уведомление с PendingIntent
+                val title = data["title"] ?: "📋 Появилось свободное время!"
+                val body = data["body"] ?: "$serviceName у $masterName • $offerDate $offerTime"
 
-            val n = android.app.Notification.Builder(this, "client_reminders")
-                .setContentTitle(title)
-                .setContentText(body)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .build()
-            getSystemService(NotificationManager::class.java).notify(System.currentTimeMillis().toInt(), n)
+                val pendingIntent = android.app.PendingIntent.getActivity(
+                    this, 0, foregroundIntent,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                )
 
-            // Пытаемся открыть диалог сразу если приложение на переднем плане (может не сработать в фоне)
-            try {
-                startActivity(foregroundIntent)
-            } catch (_: Exception) {}
+                val n = android.app.Notification.Builder(this, "client_reminders")
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setAutoCancel(true)
+                    .setContentIntent(pendingIntent)
+                    .build()
+                getSystemService(NotificationManager::class.java).notify(System.currentTimeMillis().toInt(), n)
+            }
             return
         }
 
