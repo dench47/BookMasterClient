@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent?.getBooleanExtra("showWaitingOffer", false) == true) {
             pendingShowWaitingOffer = true
+            intent.removeExtra("showWaitingOffer") // чтобы при повороте экрана не срабатывало повторно
         }
     }
 }

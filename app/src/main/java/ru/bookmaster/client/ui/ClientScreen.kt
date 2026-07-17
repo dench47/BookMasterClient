@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -24,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -641,11 +643,49 @@ fun ClientScreen(
                         if (slots.isEmpty()) {
                             Text("Нет свободного времени", color = Color.Gray)
                             Spacer(Modifier.height(8.dp))
-                            OutlinedButton(
-                                onClick = { viewModel.addToWaitingList() },
-                                modifier = Modifier.fillMaxWidth()
+                            var showWaitingListInfoDialog by remember { mutableStateOf(false) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("🔔 В лист ожидания")
+                                OutlinedButton(
+                                    onClick = {
+                                        if (state.isInWaitingList) {
+                                            viewModel.showWaitingListManageDialog()
+                                        } else {
+                                            viewModel.addToWaitingList()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(if (state.isInWaitingList) "⏳ Вы уже в очереди" else "🔔 В лист ожидания")
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = { showWaitingListInfoDialog = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Info,
+                                        contentDescription = "Информация",
+                                        tint = Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
+                            // Диалог с описанием
+                            if (showWaitingListInfoDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showWaitingListInfoDialog = false },
+                                    title = { Text("ℹ️ Лист ожидания") },
+                                    text = {
+                                        Text("Если нет свободного времени — вы можете встать в очередь. Когда у выбранного специалиста появится свободное окно, вы получите уведомление с предложением записаться.")
+                                    },
+                                    confirmButton = {
+                                        TextButton(onClick = { showWaitingListInfoDialog = false }) {
+                                            Text("Понятно")
+                                        }
+                                    }
+                                )
                             }
                         } else Row(Modifier.horizontalScroll(rememberScrollState())) {
                             slots.forEach { t ->
@@ -683,6 +723,35 @@ fun ClientScreen(
                     confirmButton = {
                         TextButton(onClick = { viewModel.clearWaitingListSuccess() }) {
                             Text("ОК")
+                        }
+                    }
+                )
+            }
+
+            // Диалог управления листом ожидания (когда клиент уже в очереди)
+            if (state.showWaitingListManageDialog) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.hideWaitingListManageDialog() },
+                    title = { Text("⏳ Вы уже в очереди") },
+                    text = {
+                        Text("Вы находитесь в листе ожидания.\n\nЧтобы записаться к другому специалисту или на другую дату — просто выберите их ниже и нажмите кнопку записи.")
+                    },
+                    confirmButton = {
+                        Column {
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.leaveWaitingList()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFCA5A5))
+                            ) {
+                                Text("🚪 Выйти из очереди")
+                            }
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.hideWaitingListManageDialog() }) {
+                            Text("Закрыть")
                         }
                     }
                 )

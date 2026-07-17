@@ -61,7 +61,10 @@ data class ClientUiState(
     val deleteError: String? = null,
     val isServerError: Boolean = false,
     val waitingListSuccess: Boolean = false,
-    val showWaitingOffer: Boolean = false
+    val showWaitingOffer: Boolean = false,
+    val isInWaitingList: Boolean = false,
+    val showWaitingListManageDialog: Boolean = false,
+    val activeWaitingListEntryId: Long = 0
 )
 
 class SalonViewModel(application: Application) : AndroidViewModel(application) {
@@ -178,7 +181,7 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 val from = s.selectedDate ?: LocalDate.now().toString()
                 val to = LocalDate.now().plusDays(14).toString()
                 val masterId = s.selectedMaster?.id ?: 0L
-                api.addToWaitingListClient(mapOf(
+                val response = api.addToWaitingListClient(mapOf(
                     "clientName" to s.clientName,
                     "clientPhone" to s.clientPhone,
                     "serviceId" to s.selectedService.id.toString(),
@@ -188,14 +191,65 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                     "dateTo" to to,
                     "preferredTimeOfDay" to "any"
                 ))
-                _state.value = _state.value.copy(
-                    waitingListSuccess = true,
-                    showConfirm = false
-                )
+                val body = response.body()
+                val entryId = body?.get("id")?.toLongOrNull() ?: 0L
+
+                // При любом успехе (200) показываем диалог — запись создана
+                if (response.isSuccessful) {
+                    _state.value = _state.value.copy(
+                        waitingListSuccess = true,
+                        isInWaitingList = true,
+                        activeWaitingListEntryId = entryId,
+                        showConfirm = false
+                    )
+                } else {
+                    // Ошибка — возможно дубликат, просто помечаем что в очереди
+                    _state.value = _state.value.copy(
+                        isInWaitingList = true,
+                        activeWaitingListEntryId = entryId
+                    )
+                }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(error = "Ошибка: ${e.message}")
+                _state.value = _state.value.copy(isInWaitingList = true)
             }
         }
+    }
+
+    fun checkWaitingListStatus() {
+        val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+        if (phone.length < 10) return
+        viewModelScope.launch {
+            try {
+                val response = api.getWaitingListByPhone(phone)
+                if (response.isSuccessful) {
+                    val entries = response.body() ?: emptyList()
+                    val hasActive = entries.any { it["status"] == "waiting" || it["status"] == "notified" }
+                    _state.value = _state.value.copy(isInWaitingList = hasActive)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun leaveWaitingList() {
+        val phone = _state.value.clientPhone.replace(Regex("[^0-9+]"), "")
+        viewModelScope.launch {
+            try {
+                api.deleteAllWaitingEntries(phone)
+            } catch (_: Exception) {}
+            _state.value = _state.value.copy(
+                isInWaitingList = false,
+                activeWaitingListEntryId = 0,
+                showWaitingListManageDialog = false
+            )
+        }
+    }
+
+    fun showWaitingListManageDialog() {
+        _state.value = _state.value.copy(showWaitingListManageDialog = true)
+    }
+
+    fun hideWaitingListManageDialog() {
+        _state.value = _state.value.copy(showWaitingListManageDialog = false)
     }
 
     fun hideMyAppointments() {

@@ -57,16 +57,14 @@ class ClientMessagingService : FirebaseMessagingService() {
                 putString("masterName", masterName)
             }
 
-            // Отправляем Intent напрямую в MainActivity, чтобы диалог открылся даже если приложение на переднем плане
+            // Сначала показываем системное уведомление — работает всегда (foreground/background/killed)
+            val title = data["title"] ?: "📋 Появилось свободное время!"
+            val body = data["body"] ?: "$serviceName у $masterName • $offerDate $offerTime"
+
             val foregroundIntent = android.content.Intent(this, ru.bookmaster.client.MainActivity::class.java).apply {
                 flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("showWaitingOffer", true)
             }
-            startActivity(foregroundIntent)
-
-            // Показываем системное уведомление — чтобы FCM дошло даже когда приложение свёрнуто/убито
-            val title = data["title"] ?: "📋 Появилось свободное время!"
-            val body = data["body"] ?: "$serviceName у $masterName • $offerDate $offerTime"
 
             val pendingIntent = android.app.PendingIntent.getActivity(
                 this, 0, foregroundIntent,
@@ -81,6 +79,11 @@ class ClientMessagingService : FirebaseMessagingService() {
                 .setContentIntent(pendingIntent)
                 .build()
             getSystemService(NotificationManager::class.java).notify(System.currentTimeMillis().toInt(), n)
+
+            // Пытаемся открыть диалог сразу если приложение на переднем плане (может не сработать в фоне)
+            try {
+                startActivity(foregroundIntent)
+            } catch (_: Exception) {}
             return
         }
 

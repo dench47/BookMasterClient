@@ -69,6 +69,12 @@ interface BookMasterClientApi {
     @POST("api/waiting-list/client")
     suspend fun addToWaitingListClient(@Body body: Map<String, String>): Response<Map<String, String>>
 
+    @GET("api/waiting-list/client/{phone}")
+    suspend fun getWaitingListByPhone(@Path("phone") phone: String): Response<List<Map<String, String>>>
+
+    @DELETE("api/waiting-list/client/{phone}")
+    suspend fun deleteAllWaitingEntries(@Path("phone") phone: String): Response<Map<String, String>>
+
     @POST("api/waiting-list/{id}/accept")
     suspend fun acceptWaitingOffer(@Path("id") id: Long): Response<Map<String, Any>>
 
