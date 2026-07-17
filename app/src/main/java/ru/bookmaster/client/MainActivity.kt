@@ -2,6 +2,7 @@ package ru.bookmaster.client
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +17,9 @@ import ru.bookmaster.client.ui.VerifyScreen
 import ru.bookmaster.client.ui.theme.ClientTheme
 
 class MainActivity : ComponentActivity() {
+    // Состояние, доступное для обновления из onNewIntent
+    private var pendingShowWaitingOffer by mutableStateOf(false)
+
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +38,9 @@ class MainActivity : ComponentActivity() {
                 .launch(Manifest.permission.CALL_PHONE)
         }
 
+        // Проверяем исходный intent при первом запуске
+        handleIntent(intent)
+
         setContent {
             ClientTheme {
                 var isVerified by remember { mutableStateOf(false) }
@@ -41,9 +48,6 @@ class MainActivity : ComponentActivity() {
                 val prefs = getSharedPreferences("verify_prefs", MODE_PRIVATE)
                 val alreadyVerified = prefs.getBoolean("is_verified", false)
                 val savedPhone = prefs.getString("phone", "") ?: ""
-
-                // Проверяем, пришли ли мы по уведомлению из листа ожидания
-                val showWaitingOffer = intent?.getBooleanExtra("showWaitingOffer", false) ?: false
 
                 if (alreadyVerified && savedPhone.isNotBlank()) {
                     isVerified = true
@@ -58,9 +62,20 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    ClientScreen(verifiedPhone = verifiedPhone, showWaitingOffer = showWaitingOffer)
+                    ClientScreen(verifiedPhone = verifiedPhone, showWaitingOffer = pendingShowWaitingOffer)
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("showWaitingOffer", false) == true) {
+            pendingShowWaitingOffer = true
         }
     }
 }
