@@ -62,6 +62,7 @@ data class ClientUiState(
     val isServerError: Boolean = false,
     val waitingListSuccess: Boolean = false,
     val showWaitingOffer: Boolean = false,
+    val waitingOfferDeclined: Boolean = false,
     val isInWaitingList: Boolean = false,
     val showWaitingListManageDialog: Boolean = false,
     val activeWaitingListEntryId: Long = 0
@@ -894,19 +895,43 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
         val entryId = prefs.getLong("entryId", -1L)
         prefs.edit { clear() }
         if (entryId <= 0) {
-            _state.value = _state.value.copy(showWaitingOffer = false)
+            _state.value = _state.value.copy(showWaitingOffer = false, waitingOfferDeclined = true)
             return
         }
         viewModelScope.launch {
             try {
-                api.declineWaitingOffer(entryId)
-            } catch (_: Exception) {}
+                val response = api.declineWaitingOffer(entryId)
+                val body = response.body()
+                val passedToNext = body?.get("passedToNext")?.toString()?.toBoolean() ?: false
+                if (passedToNext) {
+                    // Предложение передано следующему — помечаем как отказались
+                    _state.value = _state.value.copy(
+                        showWaitingOffer = false,
+                        isInWaitingList = false,
+                        waitingOfferDeclined = true
+                    )
+                } else {
+                    // Никого больше нет — показываем слот как свободный
+                    _state.value = _state.value.copy(
+                        showWaitingOffer = false,
+                        isInWaitingList = false,
+                        waitingOfferDeclined = false
+                    )
+                }
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(
+                    showWaitingOffer = false,
+                    isInWaitingList = false,
+                    waitingOfferDeclined = true
+                )
+            }
         }
-        _state.value = _state.value.copy(showWaitingOffer = false)
     }
 
     fun showWaitingOfferDialog() {
-        _state.value = _state.value.copy(showWaitingOffer = true)
+        if (!_state.value.waitingOfferDeclined) {
+            _state.value = _state.value.copy(showWaitingOffer = true)
+        }
     }
 
     fun hideWaitingOfferDialog() {

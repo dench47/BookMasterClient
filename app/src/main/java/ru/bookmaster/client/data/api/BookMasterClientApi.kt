@@ -79,6 +79,6 @@ interface BookMasterClientApi {
     suspend fun acceptWaitingOffer(@Path("id") id: Long): Response<Map<String, Any>>
 
     @POST("api/waiting-list/{id}/decline")
-    suspend fun declineWaitingOffer(@Path("id") id: Long): Response<Map<String, String>>
+    suspend fun declineWaitingOffer(@Path("id") id: Long): Response<Map<String, Any>>
 
 }

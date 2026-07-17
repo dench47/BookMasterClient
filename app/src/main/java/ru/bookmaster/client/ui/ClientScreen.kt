@@ -87,7 +87,7 @@ fun ClientScreen(
 
     // Если пришли по уведомлению из листа ожидания — показываем диалог
     LaunchedEffect(showWaitingOfferVersion) {
-        if (showWaitingOfferVersion > 0) {
+        if (showWaitingOfferVersion > 0 && !state.waitingOfferDeclined) {
             viewModel.showWaitingOfferDialog()
             // Вибрация при показе диалога
             try {
@@ -655,15 +655,23 @@ fun ClientScreen(
                             ) {
                                 OutlinedButton(
                                     onClick = {
+                                        if (state.waitingOfferDeclined) return@OutlinedButton
                                         if (state.isInWaitingList) {
                                             viewModel.showWaitingListManageDialog()
                                         } else {
                                             viewModel.addToWaitingList()
                                         }
                                     },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    enabled = !state.waitingOfferDeclined
                                 ) {
-                                    Text(if (state.isInWaitingList) "⏳ Вы уже в очереди" else "🔔 В лист ожидания")
+                                    Text(
+                                        when {
+                                            state.waitingOfferDeclined -> "🚫 Вы отказались"
+                                            state.isInWaitingList -> "⏳ Вы уже в очереди"
+                                            else -> "🔔 В лист ожидания"
+                                        }
+                                    )
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 IconButton(
