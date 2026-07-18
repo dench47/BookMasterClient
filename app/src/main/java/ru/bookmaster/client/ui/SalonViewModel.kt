@@ -876,10 +876,8 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                 val response = api.acceptWaitingOffer(entryId)
                 if (response.isSuccessful) {
                     prefs.edit { clear() }
-                    _state.value = _state.value.copy(
-                        error = "✅ Запись создана! Проверьте «Мои записи».",
-                        showWaitingOffer = false
-                    )
+                    _state.value = _state.value.copy(showWaitingOffer = false)
+                    loadMyAppointments()
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Ошибка"
                     _state.value = _state.value.copy(error = "❌ $errorBody", showWaitingOffer = false)
