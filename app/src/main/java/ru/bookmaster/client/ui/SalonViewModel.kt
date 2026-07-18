@@ -893,11 +893,21 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
     fun declineWaitingOffer() {
         val prefs = app.getSharedPreferences("waiting_offer", Context.MODE_PRIVATE)
         val entryId = prefs.getLong("entryId", -1L)
+        // Сохраняем данные слота до очистки
+        val offerDate = prefs.getString("date", null)
+        val offerTime = prefs.getString("time", null)
+        val offerMasterName = prefs.getString("masterName", null)
         prefs.edit { clear() }
         if (entryId <= 0) {
             _state.value = _state.value.copy(showWaitingOffer = false, waitingOfferDeclined = true)
             return
         }
+
+        // Находим мастера по имени (если есть в salonInfo) и переключаемся на него
+        val offerMaster = _state.value.salonInfo?.masters
+            ?.find { it.name == offerMasterName }
+        val masterId = offerMaster?.id
+
         viewModelScope.launch {
             try {
                 val response = api.declineWaitingOffer(entryId)
@@ -911,12 +921,13 @@ class SalonViewModel(application: Application) : AndroidViewModel(application) {
                         waitingOfferDeclined = true
                     )
                 } else {
-                    // Никого больше нет — показываем слот как свободный
+                    // Никого больше нет — возвращаемся к начальному экрану (список услуг/мастеров)
                     _state.value = _state.value.copy(
                         showWaitingOffer = false,
                         isInWaitingList = false,
                         waitingOfferDeclined = false
                     )
+                    backToSalon()
                 }
             } catch (_: Exception) {
                 _state.value = _state.value.copy(

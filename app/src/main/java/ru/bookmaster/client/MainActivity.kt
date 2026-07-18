@@ -70,7 +70,11 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    ClientScreen(verifiedPhone = verifiedPhone, showWaitingOfferVersion = pendingShowWaitingOfferVersion)
+                    ClientScreen(
+                        verifiedPhone = verifiedPhone,
+                        showWaitingOfferVersion = pendingShowWaitingOfferVersion,
+                        onOfferShown = { pendingShowWaitingOfferVersion = 0 }
+                    )
                 }
             }
         }

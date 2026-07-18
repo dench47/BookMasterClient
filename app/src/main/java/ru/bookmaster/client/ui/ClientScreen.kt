@@ -71,6 +71,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun ClientScreen(
     verifiedPhone: String = "",
     showWaitingOfferVersion: Int = 0,
+    onOfferShown: () -> Unit = {},
     viewModel: SalonViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -89,6 +90,7 @@ fun ClientScreen(
     LaunchedEffect(showWaitingOfferVersion) {
         if (showWaitingOfferVersion > 0 && !state.waitingOfferDeclined) {
             viewModel.showWaitingOfferDialog()
+            onOfferShown() // сбрасываем версию, чтобы при повороте не показывалось повторно
             // Вибрация при показе диалога
             try {
                 val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
